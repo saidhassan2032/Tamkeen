@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "app/api/chat/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/sessions/route.ts": {
+      "maxDuration": 90
+    },
+    "app/api/reports/[id]/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/guidance/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
