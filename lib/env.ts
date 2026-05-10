@@ -20,7 +20,7 @@ export function ensureEnv() {
   if (process.env.NODE_ENV === 'production') return;
   if (typeof window !== 'undefined') return; // server only
 
-  const keys = ['ANTHROPIC_API_KEY', 'TURSO_DATABASE_URL', 'TURSO_AUTH_TOKEN', 'NEXT_PUBLIC_BASE_URL'];
+  const keys = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'TURSO_DATABASE_URL', 'TURSO_AUTH_TOKEN', 'NEXT_PUBLIC_BASE_URL'];
   const allSet = keys.every((k) => (process.env[k] ?? '').trim().length > 0);
   if (allSet) return;
 
