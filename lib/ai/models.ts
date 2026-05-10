@@ -6,10 +6,10 @@ export type Purpose = 'tasks' | 'chat' | 'guide' | 'report';
 
 const modelConfig: Record<Provider, Record<Purpose, string>> = {
   anthropic: {
-    tasks:  'claude-3-5-haiku-20241022',
-    chat:   'claude-3-5-sonnet-20241022',
-    guide:  'claude-3-5-haiku-20241022',
-    report: 'claude-3-5-sonnet-20241022',
+    tasks:  'claude-haiku-4-5',
+    chat:   'claude-haiku-4-5',
+    guide:  'claude-haiku-4-5',
+    report: 'claude-haiku-4-5',
   },
   gemini: {
     tasks:  'gemini-3.1-flash-lite',
