@@ -1,5 +1,5 @@
 import '@/lib/env';
-import { generateObject, generateText, streamText } from 'ai';
+import { generateText, streamText, Output } from 'ai';
 import { getModel } from './models';
 import { z } from 'zod/v4';
 import type { Attachment } from '@/types';
@@ -63,13 +63,13 @@ async function generateOneTask(
   prevTitles: string[],
 ): Promise<GeneratedTask | null> {
   try {
-    const { object } = await generateObject({
+    const result = await generateText({
       model: getModel('tasks'),
       maxOutputTokens: 2000,
-      schema: TaskSchema,
+      output: Output.object({ schema: TaskSchema, name: 'task' }),
       prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTitles),
     });
-    return object as GeneratedTask;
+    return result.output as GeneratedTask;
   } catch (err) {
     console.error('[generateOneTask] failed', { idx: index, error: String(err) });
     return null;
@@ -277,10 +277,10 @@ export async function generateReport(
   conversationsSummary: string,
 ): Promise<ReportData> {
   try {
-    const { object } = await generateObject({
+    const result = await generateText({
       model: getModel('report'),
       maxOutputTokens: 2000,
-      schema: ReportSchema,
+      output: Output.object({ schema: ReportSchema, name: 'report' }),
       prompt: `أنت محلل أداء مهني. حلّل هذه المحاكاة وأنشئ تقريراً شاملاً.
 
 المسار الوظيفي: ${trackTitle}
@@ -294,18 +294,7 @@ ${conversationsSummary}
 أعطِ تقييمات صادقة بناءً على المحادثات. الدرجات بين 0-100. النصوص بالعربية.`,
     });
 
-    const r = object as any;
-    return {
-      overallScore: r.overallScore ?? 0,
-      qualityScore: r.qualityScore ?? 0,
-      speedScore: r.speedScore ?? 0,
-      communicationScore: r.communicationScore ?? 0,
-      verdict: r.verdict ?? '',
-      strengths: r.strengths ?? [],
-      improvements: r.improvements ?? [],
-      agentFeedbacks: r.agentFeedbacks ?? {},
-      recommendation: r.recommendation ?? '',
-    };
+    return result.output as ReportData;
   } catch {
     return {
       overallScore: 0,
