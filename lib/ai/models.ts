@@ -12,10 +12,10 @@ const modelConfig: Record<Provider, Record<Purpose, string>> = {
     report: 'claude-3-5-sonnet-20241022',
   },
   gemini: {
-    tasks:  'gemini-2.0-flash',
-    chat:   'gemini-2.0-flash',
-    guide:  'gemini-2.0-flash',
-    report: 'gemini-1.5-pro',
+    tasks:  'gemini-3.1-flash-lite',
+    chat:   'gemini-3.1-flash-lite',
+    guide:  'gemini-3.1-flash-lite',
+    report: 'gemini-3.1-flash-lite',
   },
 };
 
