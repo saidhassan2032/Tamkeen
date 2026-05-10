@@ -1,5 +1,5 @@
 import '@/lib/env';
-import { generateText, streamText, Output } from 'ai';
+import { generateText, streamText, Output, NoObjectGeneratedError } from 'ai';
 import { getModel } from './models';
 import { z } from 'zod/v4';
 import type { Attachment } from '@/types';
@@ -27,7 +27,7 @@ const TaskResourceSchema = z.object({
 const TaskSchema = z.object({
   title: z.string().describe('اسم المهمة (5-10 كلمات)'),
   description: z.string().describe('وصف مختصر للمهمة (سطر-سطرين)'),
-  deadlineMinutes: z.number().int().min(10).max(30),
+  deadlineMinutes: z.number().int().min(10).max(180),
   difficulty: z.number().int().min(1).max(5),
   waitingAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
   assignedByAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
@@ -71,7 +71,12 @@ async function generateOneTask(
     });
     return result.output as GeneratedTask;
   } catch (err) {
-    console.error('[generateOneTask] failed', { idx: index, error: String(err) });
+    if (NoObjectGeneratedError.isInstance(err)) {
+      console.error(`[generateOneTask #${index}] text:`, err.text);
+      console.error(`[generateOneTask #${index}] finishReason:`, err.finishReason);
+    } else {
+      console.error(`[generateOneTask #${index}]`, String(err));
+    }
     return null;
   }
 }
@@ -295,7 +300,13 @@ ${conversationsSummary}
     });
 
     return result.output as ReportData;
-  } catch {
+  } catch (err) {
+    if (NoObjectGeneratedError.isInstance(err)) {
+      console.error('[generateReport] text:', err.text);
+      console.error('[generateReport] finishReason:', err.finishReason);
+    } else {
+      console.error('[generateReport]', String(err));
+    }
     return {
       overallScore: 0,
       qualityScore: 0,
