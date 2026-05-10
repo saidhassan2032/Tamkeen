@@ -1,0 +1,322 @@
+import '@/lib/env';
+import { generateObject, generateText, streamText } from 'ai';
+import { getModel } from './models';
+import { z } from 'zod/v4';
+import type { Attachment } from '@/types';
+
+// ── Task generation ───────────────────────────────────────────────────────
+
+export interface GeneratedTask {
+  title: string;
+  description: string;
+  resources: Array<{ name: string; type: string; content: string }>;
+  deadlineMinutes: number;
+  waitingAgentId: string;
+  assignedByAgentId: string;
+  difficulty: number;
+  guidanceTips: string[];
+  starterMessage: string;
+}
+
+const TaskResourceSchema = z.object({
+  name: z.string(),
+  type: z.enum(['text', 'table', 'requirements']),
+  content: z.string().describe('مختصر، ≤ 6 أسطر'),
+});
+
+const TaskSchema = z.object({
+  title: z.string().describe('اسم المهمة (5-10 كلمات)'),
+  description: z.string().describe('وصف مختصر للمهمة (سطر-سطرين)'),
+  deadlineMinutes: z.number().int().min(10).max(30),
+  difficulty: z.number().int().min(1).max(5),
+  waitingAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
+  assignedByAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
+  resources: z.array(TaskResourceSchema).max(2),
+  guidanceTips: z.array(z.string()).max(3),
+  starterMessage: z.string().describe(
+    'رسالة من الـ assignedByAgentId بعامية سعودية مختصرة (4-7 أسطر بإجمالي ≤ 350 كلمة)',
+  ),
+});
+
+function makeTaskPrompt(
+  trackId: string,
+  companyContext: string,
+  index: number,
+  total: number,
+  prevTitles: string[],
+) {
+  return `مصمم محتوى تدريبي لمنصة سعودية.
+
+المسار: ${trackId}
+البيئة: ${companyContext}
+المهمة رقم ${index + 1} من ${total} (الصعوبة المقترحة: ${Math.min(5, index + 1)}).
+${prevTitles.length ? `المهام السابقة في نفس الجلسة (لا تكررها): ${prevTitles.join('، ')}` : ''}
+
+اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
+}
+
+async function generateOneTask(
+  trackId: string,
+  companyContext: string,
+  index: number,
+  total: number,
+  prevTitles: string[],
+): Promise<GeneratedTask | null> {
+  try {
+    const { object } = await generateObject({
+      model: getModel('tasks'),
+      maxOutputTokens: 2000,
+      schema: TaskSchema,
+      prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTitles),
+    });
+    return object as GeneratedTask;
+  } catch (err) {
+    console.error('[generateOneTask] failed', { idx: index, error: String(err) });
+    return null;
+  }
+}
+
+export async function generateTasks(
+  trackId: string,
+  companyContext: string,
+  mode: string,
+  duration?: string | null,
+): Promise<GeneratedTask[]> {
+  const count = mode === 'quick' ? 3 : duration === '1week' ? 5 : 8;
+
+  const titles: string[] = [];
+  const promises: Promise<GeneratedTask | null>[] = [];
+  for (let i = 0; i < count; i++) {
+    promises.push(generateOneTask(trackId, companyContext, i, count, [...titles]));
+  }
+  const results = await Promise.all(promises);
+  const tasks = results.filter((t): t is GeneratedTask => t !== null);
+
+  if (tasks.length === 0) {
+    throw new Error('لم يُرجع أي مهام، حاول مجدداً');
+  }
+  return tasks;
+}
+
+// ── Streaming agent chat reply ────────────────────────────────────────────
+
+export interface HistoryItem {
+  role: 'user' | 'assistant';
+  content: string;
+  attachments?: Attachment[];
+}
+
+function buildMessages(history: HistoryItem[]) {
+  return history.map((m) => {
+    if (!m.attachments?.length) {
+      return { role: m.role, content: m.content || '...' };
+    }
+    const parts: any[] = [];
+    let textBuffer = m.content?.trim() ? m.content.trim() : '';
+    for (const att of m.attachments) {
+      if (att.type === 'image') {
+        if (textBuffer) {
+          parts.push({ type: 'text', text: textBuffer });
+          textBuffer = '';
+        }
+        parts.push({ type: 'image', image: att.data, mimeType: att.mediaType });
+      } else {
+        textBuffer += `\n\n--- ملف مرفق: ${att.name} ---\n${att.data}\n--- نهاية الملف ---`;
+      }
+    }
+    if (textBuffer) parts.push({ type: 'text', text: textBuffer });
+    if (!parts.length) parts.push({ type: 'text', text: '...' });
+    return { role: m.role, content: parts };
+  });
+}
+
+function makeSystemPrompt(
+  agentName: string,
+  agentRoleTitle: string,
+  agentPersonality: string,
+  agentRoleInTask: string,
+  companyContext: string,
+  trackTitle: string,
+  taskTitle: string,
+  taskDescription: string,
+  timeRemainingMinutes: number,
+  shouldEvaluate: boolean,
+) {
+  return `أنت ${agentName}، ${agentRoleTitle} في ${companyContext}.
+
+المستخدم هو ${trackTitle} جديد في أول شهر له في العمل.
+
+المهمة الحالية: "${taskTitle}"
+وصف المهمة: ${taskDescription}
+الوقت المتبقي: ${timeRemainingMinutes} دقيقة
+
+شخصيتك: ${agentPersonality}
+دورك في هذه المهمة: ${agentRoleInTask}
+
+تعليمات:
+- تحدث بعامية سعودية بسيطة وطبيعية
+- رسائلك مختصرة (3-4 جمل max)
+- كن إنساناً واقعياً — أحياناً متوتر، أحياناً داعم
+- لا تخرج عن سياق بيئة العمل
+- إذا أرفق المستخدم ملف أو صورة، علّق عليها بشكل محدد ومفيد (بدون مبالغة)
+- إذا أرفق كود/جدول، راجعه باختصار وقل ما الذي صح وما الذي يحتاج تعديل
+${shouldEvaluate ? `
+
+بعد ردك قيّم أداء المستخدم واكتب في النهاية على سطر منفصل:
+SCORE_JSON:{"quality":XX,"speed":XX,"communication":XX,"verdict":"تقييم 2-3 جمل عربية"}` : ''}`;
+}
+
+export async function streamAgentReply(
+  agentName: string,
+  agentRoleTitle: string,
+  agentPersonality: string,
+  agentRoleInTask: string,
+  companyContext: string,
+  trackTitle: string,
+  taskTitle: string,
+  taskDescription: string,
+  timeRemainingMinutes: number,
+  conversationHistory: HistoryItem[],
+  shouldEvaluate: boolean,
+  onChunk: (text: string) => void,
+  onDone: (fullText: string) => void,
+): Promise<string> {
+  let fullText = '';
+
+  const safeHistory: HistoryItem[] =
+    conversationHistory.length > 0
+      ? conversationHistory
+      : [{ role: 'user', content: 'السلام عليكم' }];
+
+  const result = streamText({
+    model: getModel('chat'),
+    maxOutputTokens: 600,
+    system: makeSystemPrompt(
+      agentName,
+      agentRoleTitle,
+      agentPersonality,
+      agentRoleInTask,
+      companyContext,
+      trackTitle,
+      taskTitle,
+      taskDescription,
+      timeRemainingMinutes,
+      shouldEvaluate,
+    ),
+    messages: buildMessages(safeHistory) as any,
+  });
+
+  for await (const chunk of result.textStream) {
+    fullText += chunk;
+    onChunk(chunk);
+  }
+
+  onDone(fullText);
+  return fullText;
+}
+
+// ── Manager guidance hint ─────────────────────────────────────────────────
+
+export async function getGuidance(
+  managerName: string,
+  taskTitle: string,
+  taskDescription: string,
+  trackTitle: string,
+): Promise<string> {
+  const { text } = await generateText({
+    model: getModel('guide'),
+    maxOutputTokens: 300,
+    messages: [
+      {
+        role: 'user',
+        content: `أنت ${managerName} مدير. موظف جديد (${trackTitle}) لا يعرف كيف يبدأ مهمة "${taskTitle}": ${taskDescription}
+
+أعطه 3 خطوات عملية محددة للبداية. عامية سعودية بسيطة. كن مشجعاً لكن مباشراً.`,
+      },
+    ],
+  });
+  return text;
+}
+
+// ── Report generation ─────────────────────────────────────────────────────
+
+export interface ReportData {
+  overallScore: number;
+  qualityScore: number;
+  speedScore: number;
+  communicationScore: number;
+  verdict: string;
+  strengths: string[];
+  improvements: string[];
+  agentFeedbacks: Record<string, string>;
+  recommendation?: string;
+}
+
+const ReportSchema = z.object({
+  overallScore: z.number().int().min(0).max(100),
+  qualityScore: z.number().int().min(0).max(100),
+  speedScore: z.number().int().min(0).max(100),
+  communicationScore: z.number().int().min(0).max(100),
+  verdict: z.string().describe('تقييم شامل 3-4 جمل'),
+  strengths: z.array(z.string()).min(2),
+  improvements: z.array(z.string()).min(1),
+  agentFeedbacks: z.object({
+    manager: z.string(),
+    colleague_1: z.string(),
+    colleague_2: z.string(),
+  }),
+  recommendation: z.string(),
+});
+
+export async function generateReport(
+  trackTitle: string,
+  companyContext: string,
+  durationMinutes: number,
+  tasksCompleted: number,
+  totalTasks: number,
+  conversationsSummary: string,
+): Promise<ReportData> {
+  try {
+    const { object } = await generateObject({
+      model: getModel('report'),
+      maxOutputTokens: 2000,
+      schema: ReportSchema,
+      prompt: `أنت محلل أداء مهني. حلّل هذه المحاكاة وأنشئ تقريراً شاملاً.
+
+المسار الوظيفي: ${trackTitle}
+بيئة العمل: ${companyContext}
+المدة: ${durationMinutes} دقيقة
+المهام المنجزة: ${tasksCompleted} من ${totalTasks}
+
+ملخص المحادثات:
+${conversationsSummary}
+
+أعطِ تقييمات صادقة بناءً على المحادثات. الدرجات بين 0-100. النصوص بالعربية.`,
+    });
+
+    const r = object as any;
+    return {
+      overallScore: r.overallScore ?? 0,
+      qualityScore: r.qualityScore ?? 0,
+      speedScore: r.speedScore ?? 0,
+      communicationScore: r.communicationScore ?? 0,
+      verdict: r.verdict ?? '',
+      strengths: r.strengths ?? [],
+      improvements: r.improvements ?? [],
+      agentFeedbacks: r.agentFeedbacks ?? {},
+      recommendation: r.recommendation ?? '',
+    };
+  } catch {
+    return {
+      overallScore: 0,
+      qualityScore: 0,
+      speedScore: 0,
+      communicationScore: 0,
+      verdict: 'تعذّر توليد التقرير، حاول مجدداً.',
+      strengths: [],
+      improvements: [],
+      agentFeedbacks: {},
+      recommendation: '',
+    };
+  }
+}
