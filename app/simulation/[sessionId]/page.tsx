@@ -81,7 +81,6 @@ export default function SimulationPage() {
   const [notification, setNotification] = useState<Notification | null>(null);
   const [completing, setCompleting] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
 
   const warned5MinRef = useRef(false);
   const warned2MinRef = useRef(false);
@@ -229,20 +228,32 @@ export default function SimulationPage() {
       const data = await res.json();
       if (data.done) {
         setShowEndDialog(true);
-      } else {
-        await loadSession();
-        // Auto-switch to the new task's assigning agent so user sees the briefing
-        if (data.nextTask?.assignedByAgentId) {
-          setAgent(data.nextTask.assignedByAgentId);
-          setUnread((u) => ({ ...u, [data.nextTask.assignedByAgentId]: false }));
+      } else if (data.nextTask) {
+        // Incremental update: complete current task, add next task as active
+        setTasks((prev) =>
+          prev
+            .map((t) => (t.id === currentTask.id ? { ...t, status: 'completed' } : t))
+            .concat({ ...data.nextTask, status: 'active' }),
+        );
+        // Seed the starter message so the conversation shows the new briefing
+        if (data.nextTask.starterMessage && data.nextTask.assignedByAgentId) {
+          setConversations((prev) => ({
+            ...prev,
+            [data.nextTask.assignedByAgentId]: [
+              ...(prev[data.nextTask.assignedByAgentId] ?? []),
+              { role: 'assistant', content: data.nextTask.starterMessage, timestamp: data.nextTask.startedAt },
+            ],
+          }));
         }
+        // Auto-switch to the next task's assigning agent
+        setAgent(data.nextTask.assignedByAgentId);
+        setUnread((u) => ({ ...u, [data.nextTask.assignedByAgentId]: false }));
       }
     } catch (err: any) {
       setNotification({ message: err.message ?? 'حدث خطأ في الاتصال، حاول مجدداً', type: 'danger' });
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setCompleting(false);
-      setShowCompleteDialog(false);
     }
   };
 
@@ -342,32 +353,13 @@ export default function SimulationPage() {
             timeRemaining={timeRemaining}
             totalTasks={tasks.length}
             completedTasks={completedCount}
-            onComplete={() => setShowCompleteDialog(true)}
+            onComplete={handleComplete}
             isCompleting={completing}
           />
           <ResourcesPanel resources={taskResources} />
           <GuidancePanel sessionId={sessionId} guidanceTips={taskGuidance} />
         </aside>
       </div>
-
-      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>إنهاء المهمة الحالية؟</DialogTitle>
-            <DialogDescription>
-              تأكّد أنك أكملت ما يكفي من النقاش مع الفريق قبل الإنهاء — التقييم يعتمد على تواصلك ومخرجاتك.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
-              العودة للنقاش
-            </Button>
-            <Button onClick={handleComplete} disabled={completing}>
-              {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إنهاء وانتقال للمهمة التالية'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
         <DialogContent>
