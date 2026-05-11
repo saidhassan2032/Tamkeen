@@ -55,39 +55,21 @@ describe('Task Completion Endpoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Mock database transaction
+    // Mock database transaction — get() returns mockActiveTask (1st call), mockPendingTask (2nd call)
     (db.transaction as jest.Mock).mockImplementation((callback) => {
       const mockTx = {
-        select: jest.fn(() => mockTx),
-        from: jest.fn(() => mockTx),
-        where: jest.fn((...args) => {
-          mockTx.whereArgs = args;
-          return mockTx;
-        }),
-        orderBy: jest.fn(() => mockTx),
-        get: jest.fn(),
-        update: jest.fn(() => mockTx),
-        set: jest.fn(() => mockTx),
-        insert: jest.fn(() => mockTx),
-        values: jest.fn(() => mockTx),
+        select: jest.fn().mockReturnThis(),
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        get: jest.fn()
+          .mockImplementationOnce(() => mockActiveTask)
+          .mockImplementationOnce(() => mockPendingTask),
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        insert: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
       };
-      
-      // Set up the mock to return the active task when queried
-      mockTx.get.mockImplementation(() => {
-        // For the first call in transaction (checking if task exists and is active)
-        if (mockTx.whereArgs?.[0]?.toString().includes('tasks.id') && 
-            mockTx.whereArgs?.[1] === 'test-task-id') {
-          return mockActiveTask;
-        }
-        // For the second call (finding next pending task)
-        if (mockTx.whereArgs?.[0]?.toString().includes('tasks.sessionId') && 
-            mockTx.whereArgs?.[1] === mockSessionId && 
-            mockTx.whereArgs?.[2]?.toString().includes('tasks.status') && 
-            mockTx.whereArgs?.[3] === 'pending') {
-          return mockPendingTask;
-        }
-        return null;
-      });
       
       return callback(mockTx);
     });
@@ -113,27 +95,21 @@ describe('Task Completion Endpoint', () => {
     });
 
     test('should return done=true when no pending tasks exist', async () => {
-      // Mock transaction to return null for pending task query
+      // Mock transaction: 1st get() = task exists, 2nd get() = no pending tasks
       (db.transaction as jest.Mock).mockImplementation((callback) => {
         const mockTx = {
           select: jest.fn().mockReturnThis(),
           from: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
           orderBy: jest.fn().mockReturnThis(),
-          get: jest.fn(),
+          get: jest.fn()
+            .mockImplementationOnce(() => mockActiveTask)
+            .mockImplementationOnce(() => null),
           update: jest.fn().mockReturnThis(),
           set: jest.fn().mockReturnThis(),
           insert: jest.fn().mockReturnThis(),
           values: jest.fn().mockReturnThis(),
         };
-        
-        // Return active task for first query, null for pending task query
-        mockTx.get.mockImplementation((query) => {
-          if (query.whereArgs?.[0]?.includes('tasks.id') && query.whereArgs?.[1] === 'test-task-id') {
-            return mockActiveTask;
-          }
-          return null; // No pending tasks
-        });
         
         return callback(mockTx);
       });
@@ -201,7 +177,8 @@ describe('Task Completion Endpoint', () => {
           select: jest.fn().mockReturnThis(),
           from: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
-          get: jest.fn().mockReturnValue(mockActiveTask), // Task is active
+          orderBy: jest.fn().mockReturnThis(),
+          get: jest.fn().mockReturnValue(mockActiveTask),
           update: jest.fn().mockReturnThis(),
           set: jest.fn().mockReturnThis(),
           insert: jest.fn().mockReturnThis(),
@@ -217,7 +194,8 @@ describe('Task Completion Endpoint', () => {
           select: jest.fn().mockReturnThis(),
           from: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
-          get: jest.fn().mockReturnValue({ ...mockActiveTask, status: 'completed' }), // Task already completed
+          orderBy: jest.fn().mockReturnThis(),
+          get: jest.fn().mockReturnValue({ ...mockActiveTask, status: 'completed' }),
         };
         
         return callback(mockTx);
@@ -239,7 +217,8 @@ describe('Task Completion Endpoint', () => {
 
     test('should rollback transaction on error', async () => {
       // Mock transaction to throw an error during execution
-      (db.transaction as jest.Mock).mockImplementation((callback) => {
+      (db.transaction as jest.Mock).mockReset();
+      (db.transaction as jest.Mock).mockImplementation((_callback: any) => {
         throw new Error('Database error');
       });
       

@@ -74,32 +74,28 @@ describe('Sequential Task Generation', () => {
       // Verify sequential calls with increasing context
       expect(generateText).toHaveBeenCalledTimes(3);
       
-      // First call should have no previous tasks
-      expect(generateText).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        prompt: expect.stringContaining('المهمة رقم 1 من 3'),
-        prompt: expect.not.stringContaining('المهام السابقة'),
-      }));
-      
-      // Second call should have first task in context
-      expect(generateText).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        prompt: expect.stringContaining('المهمة رقم 2 من 3'),
-        prompt: expect.stringContaining('المهام السابقة في نفس الجلسة'),
-        prompt: expect.stringContaining('المهمة السابقة 1:'),
-        prompt: expect.stringContaining('المهمة 1'),
-        prompt: expect.stringContaining('الوصف 1'),
-      }));
-      
-      // Third call should have first and second tasks in context
-      expect(generateText).toHaveBeenNthCalledWith(3, expect.objectContaining({
-        prompt: expect.stringContaining('المهمة رقم 3 من 3'),
-        prompt: expect.stringContaining('المهام السابقة في نفس الجلسة'),
-        prompt: expect.stringContaining('المهمة السابقة 1:'),
-        prompt: expect.stringContaining('المهمة 1'),
-        prompt: expect.stringContaining('الوصف 1'),
-        prompt: expect.stringContaining('المهمة السابقة 2:'),
-        prompt: expect.stringContaining('المهمة 2'),
-        prompt: expect.stringContaining('الوصف 2'),
-      }));
+      const calls = (generateText as jest.Mock).mock.calls;
+
+      // First call — no previous tasks
+      expect(calls[0][0].prompt).toContain('المهمة رقم 1 من 3');
+      expect(calls[0][0].prompt).not.toContain('المهام السابقة');
+
+      // Second call — first task in context
+      expect(calls[1][0].prompt).toContain('المهمة رقم 2 من 3');
+      expect(calls[1][0].prompt).toContain('المهام السابقة في نفس الجلسة');
+      expect(calls[1][0].prompt).toContain('المهمة السابقة 1:');
+      expect(calls[1][0].prompt).toContain('المهمة 1');
+      expect(calls[1][0].prompt).toContain('الوصف 1');
+
+      // Third call — both previous tasks in context
+      expect(calls[2][0].prompt).toContain('المهمة رقم 3 من 3');
+      expect(calls[2][0].prompt).toContain('المهام السابقة في نفس الجلسة');
+      expect(calls[2][0].prompt).toContain('المهمة السابقة 1:');
+      expect(calls[2][0].prompt).toContain('المهمة 1');
+      expect(calls[2][0].prompt).toContain('الوصف 1');
+      expect(calls[2][0].prompt).toContain('المهمة السابقة 2:');
+      expect(calls[2][0].prompt).toContain('المهمة 2');
+      expect(calls[2][0].prompt).toContain('الوصف 2');
       
       expect(result).toHaveLength(3);
       expect(result[0].title).toBe('المهمة 1');
@@ -124,14 +120,14 @@ describe('Sequential Task Generation', () => {
       expect(result[0].title).toBe('المهمة 1');
       expect(result[1].title).toBe('المهمة 3');
       
-      // Verify that third call still received context from first task
-      expect(generateText).toHaveBeenNthCalledWith(3, expect.objectContaining({
-        prompt: expect.stringContaining('المهمة رقم 3 من 3'),
-        prompt: expect.stringContaining('المهام السابقة في نفس الجلسة'),
-        prompt: expect.stringContaining('المهمة السابقة 1:'),
-        prompt: expect.stringContaining('المهمة 1'),
-        prompt: expect.stringContaining('الوصف 1'),
-      }));
+      const calls = (generateText as jest.Mock).mock.calls;
+
+      // Third call still received context from the first (successful) task
+      expect(calls[2][0].prompt).toContain('المهمة رقم 3 من 3');
+      expect(calls[2][0].prompt).toContain('المهام السابقة في نفس الجلسة');
+      expect(calls[2][0].prompt).toContain('المهمة السابقة 1:');
+      expect(calls[2][0].prompt).toContain('المهمة 1');
+      expect(calls[2][0].prompt).toContain('الوصف 1');
     });
 
     test('should throw error when no tasks are generated', async () => {
