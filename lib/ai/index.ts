@@ -38,7 +38,7 @@ const TaskSchema = z.object({
   ),
 });
 
-function makeTaskPrompt(
+export function makeTaskPrompt(
   trackId: string,
   companyContext: string,
   index: number,
@@ -57,12 +57,12 @@ function makeTaskPrompt(
 
   return `مصمم محتوى تدريبي لمنصة سعودية.
 
-المسار: ${trackId}
-البيئة: ${companyContext}
-المهمة رقم ${index + 1} من ${total} (الصعوبة المقترحة: ${Math.min(5, index + 1)}).
-${prevTasksText ? `المهام السابقة في نفس الجلسة (لا تكررها):\n${prevTasksText}` : ''}
+  المسار: ${trackId}
+  البيئة: ${companyContext}
+  المهمة رقم ${index + 1} من ${total} (الصعوبة المقترحة: ${Math.min(5, index + 1)}).
+  ${prevTasksText ? `المهام السابقة في نفس الجلسة (لا تكررها):\n${prevTasksText}` : ''}
 
-اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
+  اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
 }
 
 async function generateOneTask(

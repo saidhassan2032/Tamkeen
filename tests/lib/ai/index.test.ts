@@ -1,0 +1,148 @@
+import { generateTasks, makeTaskPrompt, generateOneTask } from '@/lib/ai';
+import { getModel } from '@/lib/ai/models';
+import { generateText, Output } from 'ai';
+
+// Mock the AI service
+jest.mock('@/lib/ai/models', () => ({
+  getModel: jest.fn(),
+}));
+
+jest.mock('ai', () => ({
+  generateText: jest.fn(),
+  streamText: jest.fn(),
+  Output: {
+    object: jest.fn(),
+  },
+  NoObjectGeneratedError: {
+    isInstance: jest.fn(),
+  },
+}));
+
+describe('Sequential Task Generation', () => {
+  const mockTrackId = 'test-track';
+  const mockCompanyContext = 'Test Company';
+  
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('makeTaskPrompt', () => {
+    test('should create prompt with no previous tasks', () => {
+      const prompt = makeTaskPrompt(mockTrackId, mockCompanyContext, 0, 3, []);
+      expect(prompt).toContain(`المسار: ${mockTrackId}`);
+      expect(prompt).toContain(`البيئة: ${mockCompanyContext}`);
+      expect(prompt).toContain('المهمة رقم 1 من 3');
+      expect(prompt).not.toContain('المهام السابقة');
+    });
+
+    test('should create prompt with previous tasks', () => {
+      const prevTasks = [
+        { title: 'المهمة الأولى', description: 'وصف المهمة الأولى' },
+        { title: 'المهمة الثانية', description: 'وصف المهمة الثانية' },
+      ];
+      
+      const prompt = makeTaskPrompt(mockTrackId, mockCompanyContext, 1, 3, prevTasks);
+      expect(prompt).toContain('المهام السابقة في نفس الجلسة');
+      expect(prompt).toContain('المهمة السابقة 1:');
+      expect(prompt).toContain('- العنوان: المهمة الأولى');
+      expect(prompt).toContain('- الوصف: وصف المهمة الأولى');
+      expect(prompt).toContain('المهمة السابقة 2:');
+      expect(prompt).toContain('- العنوان: المهمة الثانية');
+      expect(prompt).toContain('- الوصف: وصف المهمة الثانية');
+    });
+  });
+
+  describe('generateTasks', () => {
+    test('should generate tasks sequentially with context propagation', async () => {
+      const mockTasks = [
+        { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
+        { title: 'المهمة 2', description: 'الوصف 2', resources: [], deadlineMinutes: 45, waitingAgentId: 'colleague_1', assignedByAgentId: 'colleague_1', difficulty: 2, guidanceTips: [], starterMessage: 'رسالة البداية 2' },
+        { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
+      ];
+
+      // Mock generateText to return different tasks based on call count
+      (generateText as jest.Mock).mockImplementationOnce(() => ({
+        output: mockTasks[0],
+      })).mockImplementationOnce(() => ({
+        output: mockTasks[1],
+      })).mockImplementationOnce(() => ({
+        output: mockTasks[2],
+      }));
+
+      const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick');
+
+      // Verify sequential calls with increasing context
+      expect(generateText).toHaveBeenCalledTimes(3);
+      
+      // First call should have no previous tasks
+      expect(generateText).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        prompt: expect.stringContaining('المهمة رقم 1 من 3'),
+        prompt: expect.not.stringContaining('المهام السابقة'),
+      }));
+      
+      // Second call should have first task in context
+      expect(generateText).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        prompt: expect.stringContaining('المهمة رقم 2 من 3'),
+        prompt: expect.stringContaining('المهام السابقة في نفس الجلسة'),
+        prompt: expect.stringContaining('المهمة السابقة 1:'),
+        prompt: expect.stringContaining('المهمة 1'),
+        prompt: expect.stringContaining('الوصف 1'),
+      }));
+      
+      // Third call should have first and second tasks in context
+      expect(generateText).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        prompt: expect.stringContaining('المهمة رقم 3 من 3'),
+        prompt: expect.stringContaining('المهام السابقة في نفس الجلسة'),
+        prompt: expect.stringContaining('المهمة السابقة 1:'),
+        prompt: expect.stringContaining('المهمة 1'),
+        prompt: expect.stringContaining('الوصف 1'),
+        prompt: expect.stringContaining('المهمة السابقة 2:'),
+        prompt: expect.stringContaining('المهمة 2'),
+        prompt: expect.stringContaining('الوصف 2'),
+      }));
+      
+      expect(result).toHaveLength(3);
+      expect(result[0].title).toBe('المهمة 1');
+      expect(result[1].title).toBe('المهمة 2');
+      expect(result[2].title).toBe('المهمة 3');
+    });
+
+    test('should handle partial failures and return successful tasks', async () => {
+      // Mock generateText to fail on second call, succeed on others
+      (generateText as jest.Mock).mockImplementationOnce(() => ({
+        output: { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
+      })).mockImplementationOnce(() => {
+        throw new Error('AI service error');
+      }).mockImplementationOnce(() => ({
+        output: { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
+      }));
+
+      const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick');
+      
+      // Should return 2 successful tasks despite middle failure
+      expect(result).toHaveLength(2);
+      expect(result[0].title).toBe('المهمة 1');
+      expect(result[1].title).toBe('المهمة 3');
+      
+      // Verify that third call still received context from first task
+      expect(generateText).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        prompt: expect.stringContaining('المهمة رقم 3 من 3'),
+        prompt: expect.stringContaining('المهام السابقة في نفس الجلسة'),
+        prompt: expect.stringContaining('المهمة السابقة 1:'),
+        prompt: expect.stringContaining('المهمة 1'),
+        prompt: expect.stringContaining('الوصف 1'),
+      }));
+    });
+
+    test('should throw error when no tasks are generated', async () => {
+      // Mock all generateText calls to fail
+      (generateText as jest.Mock).mockImplementation(() => {
+        throw new Error('AI service error');
+      });
+
+      await expect(generateTasks(mockTrackId, mockCompanyContext, 'quick'))
+        .rejects
+        .toThrow('لم يُرجع أي مهام، حاول مجدداً');
+    });
+  });
+});
