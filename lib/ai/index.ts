@@ -43,14 +43,24 @@ function makeTaskPrompt(
   companyContext: string,
   index: number,
   total: number,
-  prevTitles: string[],
+  prevTasks: { title: string; description: string }[],
 ) {
+  const prevTasksText =
+    prevTasks.length > 0
+      ? prevTasks
+          .map(
+            (t, i) =>
+              `المهمة السابقة ${i + 1}:\n- العنوان: ${t.title}\n- الوصف: ${t.description}`,
+          )
+          .join('\n\n')
+      : '';
+
   return `مصمم محتوى تدريبي لمنصة سعودية.
 
 المسار: ${trackId}
 البيئة: ${companyContext}
 المهمة رقم ${index + 1} من ${total} (الصعوبة المقترحة: ${Math.min(5, index + 1)}).
-${prevTitles.length ? `المهام السابقة في نفس الجلسة (لا تكررها): ${prevTitles.join('، ')}` : ''}
+${prevTasksText ? `المهام السابقة في نفس الجلسة (لا تكررها):\n${prevTasksText}` : ''}
 
 اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
 }
@@ -60,14 +70,14 @@ async function generateOneTask(
   companyContext: string,
   index: number,
   total: number,
-  prevTitles: string[],
+  prevTasks: { title: string; description: string }[],
 ): Promise<GeneratedTask | null> {
   try {
     const result = await generateText({
       model: getModel('tasks'),
       maxOutputTokens: 2000,
       output: Output.object({ schema: TaskSchema, name: 'task' }),
-      prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTitles),
+      prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTasks),
     });
     return result.output as GeneratedTask;
   } catch (err) {
@@ -89,13 +99,16 @@ export async function generateTasks(
 ): Promise<GeneratedTask[]> {
   const count = mode === 'quick' ? 3 : duration === '1week' ? 5 : 8;
 
-  const titles: string[] = [];
-  const promises: Promise<GeneratedTask | null>[] = [];
+  const tasks: GeneratedTask[] = [];
+  const prevTasks: { title: string; description: string }[] = [];
+
   for (let i = 0; i < count; i++) {
-    promises.push(generateOneTask(trackId, companyContext, i, count, [...titles]));
+    const task = await generateOneTask(trackId, companyContext, i, count, prevTasks);
+    if (task) {
+      tasks.push(task);
+      prevTasks.push({ title: task.title, description: task.description });
+    }
   }
-  const results = await Promise.all(promises);
-  const tasks = results.filter((t): t is GeneratedTask => t !== null);
 
   if (tasks.length === 0) {
     throw new Error('لم يُرجع أي مهام، حاول مجدداً');
