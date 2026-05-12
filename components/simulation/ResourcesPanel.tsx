@@ -21,7 +21,7 @@ const ICON: Record<string, any> = {
 };
 
 export function ResourcesPanel({ resources }: Props) {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [openIndices, setOpenIndices] = useState<Set<number>>(new Set([0]));
 
   if (!resources.length) {
     return (
@@ -40,11 +40,18 @@ export function ResourcesPanel({ resources }: Props) {
       <div className="max-h-[280px] overflow-y-auto">
         {resources.map((resource, i) => {
           const Icon = ICON[resource.type] ?? FileText;
-          const isOpen = openIndex === i;
+          const isOpen = openIndices.has(i);
           return (
             <div key={i} className="border-b border-tamkeen-border last:border-b-0">
               <button
-                onClick={() => setOpenIndex(isOpen ? null : i)}
+                onClick={() => {
+                  setOpenIndices(prev => {
+                    const next = new Set(prev);
+                    if (next.has(i)) next.delete(i);
+                    else next.add(i);
+                    return next;
+                  });
+                }}
                 className="w-full px-4 py-2.5 flex items-center justify-between gap-2 hover:bg-tamkeen-surface2 transition-colors text-right"
               >
                 <div className="flex items-center gap-2 min-w-0">
