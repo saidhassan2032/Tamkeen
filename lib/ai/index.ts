@@ -181,7 +181,12 @@ function makeSystemPrompt(
 ${shouldEvaluate ? `
 
 بعد ردك قيّم أداء المستخدم واكتب في النهاية على سطر منفصل:
-SCORE_JSON:{"quality":XX,"speed":XX,"communication":XX,"verdict":"تقييم 2-3 جمل عربية"}` : ''}`;
+SCORE_JSON:{"quality":XX,"speed":XX,"communication":XX,"verdict":"تقييم 2-3 جمل عربية"}` : ''}
+
+في نهاية ردك، قيّم مرحلة إنجاز المهمة واكتب على سطر منفصل:
+- إذا المستخدم ما زال في البداية أو العمل قليل: TASK_STATE:started
+- إذا أغلب العمل تم لكن يحتاج تحسينات: TASK_STATE:largely
+- إذا المهمة منجزة بالكامل وكل المتطلبات تم تلبيتها: TASK_STATE:completed`;
 }
 
 export async function streamAgentReply(

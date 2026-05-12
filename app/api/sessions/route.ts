@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         starterMessage: task.starterMessage ?? null,
         deadlineMinutes: task.deadlineMinutes ?? 15,
         sortOrder: i + 1,
-        status: i === 0 ? 'active' : 'pending',
+        status: i === 0 ? 'started' : 'pending',
         difficulty: task.difficulty ?? i + 1,
         waitingAgentId: waiting,
         assignedByAgentId: assigner,

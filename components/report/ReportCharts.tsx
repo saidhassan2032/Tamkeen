@@ -12,11 +12,19 @@ import {
   CartesianGrid,
 } from 'recharts';
 
+interface TaskScore {
+  title: string;
+  quality?: number | null;
+  speed?: number | null;
+  communication?: number | null;
+  verdict?: string | null;
+}
+
 interface Report {
   qualityScore: number;
   speedScore: number;
   communicationScore: number;
-  taskScores?: Array<{ title: string; quality?: number | null; speed?: number | null; communication?: number | null }>;
+  taskScores?: TaskScore[];
 }
 
 export function ReportCharts({ report }: { report: Report }) {
@@ -34,6 +42,7 @@ export function ReportCharts({ report }: { report: Report }) {
       جودة: t.quality ?? 0,
       سرعة: t.speed ?? 0,
       تواصل: t.communication ?? 0,
+      skipped: t.verdict?.includes('تم التخطي') ?? false,
     }));
 
   return (
@@ -79,7 +88,11 @@ export function ReportCharts({ report }: { report: Report }) {
                   borderRadius: 8,
                   fontSize: 12,
                 }}
-                labelFormatter={(label, payload) => payload?.[0]?.payload?.title ?? label}
+                labelFormatter={(label, payload) => {
+                  const item = payload?.[0]?.payload;
+                  const skippedLabel = item?.skipped ? ' (تم التخطي)' : '';
+                  return `${item?.title ?? label}${skippedLabel}`;
+                }}
               />
               <Bar dataKey="جودة" fill="#388BFD" radius={[4, 4, 0, 0]} />
               <Bar dataKey="سرعة" fill="#3FB950" radius={[4, 4, 0, 0]} />

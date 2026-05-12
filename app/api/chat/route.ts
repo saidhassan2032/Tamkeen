@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { db, messages, tasks, sessions, agents } from '@/lib/db';
 import { streamAgentReply } from '@/lib/claude';
 import { createSSEStream } from '@/lib/sse';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export const maxDuration = 60;
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const [session, currentTask, agentData, history] = await Promise.all([
     db.select().from(sessions).where(eq(sessions.id, sessionId)).get(),
-    db.select().from(tasks).where(and(eq(tasks.sessionId, sessionId), eq(tasks.status, 'active'))).get(),
+    db.select().from(tasks).where(and(eq(tasks.sessionId, sessionId), or(eq(tasks.status, 'started'), eq(tasks.status, 'largely'), eq(tasks.status, 'active')))).get(),
     db.select().from(agents).where(eq(agents.id, agentId)).get(),
     db
       .select()
@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
     send({ type: 'typing', agentId });
 
     let fullText = '';
+    let sentUpTo = 0;
+    const markers = ['SCORE_JSON:', 'TASK_STATE:'];
     await streamAgentReply(
       agentData.name,
       agentData.roleTitle,
@@ -89,14 +91,25 @@ export async function POST(req: NextRequest) {
       shouldEvaluate,
       (chunk) => {
         fullText += chunk;
-        send({ type: 'chunk', agentId, text: chunk });
+
+        let cutPos = fullText.length;
+        for (const m of markers) {
+          const i = fullText.indexOf(m);
+          if (i >= 0 && i < cutPos) cutPos = i;
+        }
+
+        if (sentUpTo < cutPos) {
+          send({ type: 'chunk', agentId, text: fullText.slice(sentUpTo, cutPos) });
+          sentUpTo = cutPos;
+        }
       },
       async () => {},
     );
 
-    const visibleText = fullText.includes('SCORE_JSON:')
-      ? fullText.split('SCORE_JSON:')[0].trim()
-      : fullText.trim();
+    const visibleText = fullText
+      .split('SCORE_JSON:')[0]
+      .split('TASK_STATE:')[0]
+      .trim();
 
     await db.insert(messages).values({
       id: randomUUID(),
@@ -122,6 +135,21 @@ export async function POST(req: NextRequest) {
           })
           .where(eq(tasks.id, currentTask.id));
         send({ type: 'evaluated', taskId: currentTask.id, score });
+      } catch {}
+    }
+
+    if (fullText.includes('TASK_STATE:')) {
+      try {
+        const raw = fullText.split('TASK_STATE:')[1].split('\n')[0].trim();
+        const valid = ['started', 'largely', 'completed'];
+        if (valid.includes(raw) && currentTask.status !== 'completed') {
+          const update: Record<string, any> = { status: raw };
+          if (raw === 'completed') update.completedAt = Date.now();
+          await db
+            .update(tasks)
+            .set(update)
+            .where(eq(tasks.id, currentTask.id));
+        }
       } catch {}
     }
 

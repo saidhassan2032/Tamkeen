@@ -81,12 +81,17 @@ export default function SimulationPage() {
   const [notification, setNotification] = useState<Notification | null>(null);
   const [completing, setCompleting] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
+  const [blockedDialog, setBlockedDialog] = useState<{
+    taskStatus: string;
+    feedback: string;
+    skipWarning: string;
+  } | null>(null);
 
   const warned5MinRef = useRef(false);
   const warned2MinRef = useRef(false);
   const expiredHandledRef = useRef(false);
 
-  const currentTask = tasks.find((t) => t.status === 'active');
+  const currentTask = tasks.find((t) => t.status === 'started' || t.status === 'largely');
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0];
   const isTyping = typingAgentId === activeAgent?.id;
@@ -221,21 +226,26 @@ export default function SimulationPage() {
     setCompleting(true);
     try {
       const res = await fetch(`/api/tasks/${currentTask.id}/complete`, { method: 'POST' });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         throw new Error(data.error ?? 'حدث خطأ في الاتصال، حاول مجدداً');
       }
-      const data = await res.json();
+      if (data.blocked) {
+        setBlockedDialog({
+          taskStatus: data.taskStatus,
+          feedback: data.feedback,
+          skipWarning: data.skipWarning,
+        });
+        return;
+      }
       if (data.done) {
         setShowEndDialog(true);
       } else if (data.nextTask) {
-        // Incremental update: complete current task, add next task as active
         setTasks((prev) =>
           prev
             .map((t) => (t.id === currentTask.id ? { ...t, status: 'completed' } : t))
-            .concat({ ...data.nextTask, status: 'active' }),
+            .concat(data.nextTask),
         );
-        // Seed the starter message so the conversation shows the new briefing
         if (data.nextTask.starterMessage && data.nextTask.assignedByAgentId) {
           setConversations((prev) => ({
             ...prev,
@@ -245,7 +255,44 @@ export default function SimulationPage() {
             ],
           }));
         }
-        // Auto-switch to the next task's assigning agent
+        setAgent(data.nextTask.assignedByAgentId);
+        setUnread((u) => ({ ...u, [data.nextTask.assignedByAgentId]: false }));
+      }
+    } catch (err: any) {
+      setNotification({ message: err.message ?? 'حدث خطأ في الاتصال، حاول مجدداً', type: 'danger' });
+      setTimeout(() => setNotification(null), 4000);
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    if (!currentTask || !blockedDialog) return;
+    setBlockedDialog(null);
+    setCompleting(true);
+    try {
+      const res = await fetch(`/api/tasks/${currentTask.id}/complete?force=true`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? 'حدث خطأ');
+      }
+      if (data.done) {
+        setShowEndDialog(true);
+      } else if (data.nextTask) {
+        setTasks((prev) =>
+          prev
+            .map((t) => (t.id === currentTask.id ? { ...t, status: 'completed' } : t))
+            .concat(data.nextTask),
+        );
+        if (data.nextTask.starterMessage && data.nextTask.assignedByAgentId) {
+          setConversations((prev) => ({
+            ...prev,
+            [data.nextTask.assignedByAgentId]: [
+              ...(prev[data.nextTask.assignedByAgentId] ?? []),
+              { role: 'assistant', content: data.nextTask.starterMessage, timestamp: data.nextTask.startedAt },
+            ],
+          }));
+        }
         setAgent(data.nextTask.assignedByAgentId);
         setUnread((u) => ({ ...u, [data.nextTask.assignedByAgentId]: false }));
       }
@@ -360,6 +407,36 @@ export default function SimulationPage() {
           <GuidancePanel sessionId={sessionId} guidanceTips={taskGuidance} />
         </aside>
       </div>
+
+      <Dialog open={!!blockedDialog} onOpenChange={(open) => { if (!open) setBlockedDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {blockedDialog?.taskStatus === 'largely' ? 'المهمة شبه منجزة' : 'المهمة لم تنجز بعد'}
+            </DialogTitle>
+            <DialogDescription className="text-right">
+              <p className="mb-3 text-sm">{blockedDialog?.feedback}</p>
+              <p className="text-xs text-tamkeen-amber font-medium">{blockedDialog?.skipWarning}</p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setBlockedDialog(null)}
+              className="flex-1"
+            >
+              متابعة العمل
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleSkip}
+              className="flex-1"
+            >
+              تخطي المهمة
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
         <DialogContent>

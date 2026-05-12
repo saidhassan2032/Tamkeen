@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, tasks, sessions, agents } from '@/lib/db';
 import { getGuidance } from '@/lib/claude';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 
 export const maxDuration = 30;
 export const runtime = 'nodejs';
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
 
     const [session, currentTask, manager] = await Promise.all([
       db.select().from(sessions).where(eq(sessions.id, sessionId)).get(),
-      db.select().from(tasks).where(and(eq(tasks.sessionId, sessionId), eq(tasks.status, 'active'))).get(),
+      db.select().from(tasks).where(and(eq(tasks.sessionId, sessionId), or(eq(tasks.status, 'started'), eq(tasks.status, 'largely'), eq(tasks.status, 'active')))).get(),
       db.select().from(agents).where(and(eq(agents.sessionId, sessionId), eq(agents.type, 'manager'))).get(),
     ]);
 
