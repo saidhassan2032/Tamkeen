@@ -17,4 +17,6 @@ export type {
   GeneratedTask,
   HistoryItem,
   ReportData,
+  ChatScore,
+  StreamReplyResult,
 } from './ai';

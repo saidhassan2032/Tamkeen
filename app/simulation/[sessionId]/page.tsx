@@ -199,10 +199,9 @@ export default function SimulationPage() {
           setStreamingMessage(accumulated);
         }
         if (data.type === 'done') {
-          const visible = accumulated.split('SCORE_JSON:')[0].trim();
           setConversations((prev) => ({
             ...prev,
-            [agentId]: [...(prev[agentId] ?? []), { role: 'assistant', content: visible }],
+            [agentId]: [...(prev[agentId] ?? []), { role: 'assistant', content: accumulated.trim() }],
           }));
           setStreamingMessage('');
           setTypingAgentId(null);

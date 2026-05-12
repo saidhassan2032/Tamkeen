@@ -74,10 +74,7 @@ export async function POST(req: NextRequest) {
   return createSSEStream(async (send, close) => {
     send({ type: 'typing', agentId });
 
-    let fullText = '';
-    let sentUpTo = 0;
-    const markers = ['SCORE_JSON:', 'TASK_STATE:'];
-    await streamAgentReply(
+    const result = await streamAgentReply(
       agentData.name,
       agentData.roleTitle,
       agentData.personality,
@@ -90,67 +87,39 @@ export async function POST(req: NextRequest) {
       conversationHistory,
       shouldEvaluate,
       (chunk) => {
-        fullText += chunk;
-
-        let cutPos = fullText.length;
-        for (const m of markers) {
-          const i = fullText.indexOf(m);
-          if (i >= 0 && i < cutPos) cutPos = i;
-        }
-
-        if (sentUpTo < cutPos) {
-          send({ type: 'chunk', agentId, text: fullText.slice(sentUpTo, cutPos) });
-          sentUpTo = cutPos;
-        }
+        send({ type: 'chunk', agentId, text: chunk });
       },
-      async () => {},
     );
-
-    const visibleText = fullText
-      .split('SCORE_JSON:')[0]
-      .split('TASK_STATE:')[0]
-      .trim();
 
     await db.insert(messages).values({
       id: randomUUID(),
       sessionId,
       agentId,
       role: 'assistant',
-      content: visibleText,
+      content: result.text,
       timestamp: Date.now(),
     });
 
-    if (fullText.includes('SCORE_JSON:')) {
-      try {
-        const jsonStr = fullText.split('SCORE_JSON:')[1].trim();
-        const cleaned = jsonStr.replace(/```json|```/g, '').trim();
-        const score = JSON.parse(cleaned);
-        await db
-          .update(tasks)
-          .set({
-            qualityScore: score.quality,
-            speedScore: score.speed,
-            communicationScore: score.communication,
-            verdict: score.verdict,
-          })
-          .where(eq(tasks.id, currentTask.id));
-        send({ type: 'evaluated', taskId: currentTask.id, score });
-      } catch {}
+    if (result.score) {
+      await db
+        .update(tasks)
+        .set({
+          qualityScore: result.score.quality,
+          speedScore: result.score.speed,
+          communicationScore: result.score.communication,
+          verdict: result.score.verdict,
+        })
+        .where(eq(tasks.id, currentTask.id));
+      send({ type: 'evaluated', taskId: currentTask.id, score: result.score });
     }
 
-    if (fullText.includes('TASK_STATE:')) {
-      try {
-        const raw = fullText.split('TASK_STATE:')[1].split('\n')[0].trim();
-        const valid = ['started', 'largely', 'completed'];
-        if (valid.includes(raw) && currentTask.status !== 'completed') {
-          const update: Record<string, any> = { status: raw };
-          if (raw === 'completed') update.completedAt = Date.now();
-          await db
-            .update(tasks)
-            .set(update)
-            .where(eq(tasks.id, currentTask.id));
-        }
-      } catch {}
+    if (result.taskState && currentTask.status !== 'completed') {
+      const update: Record<string, any> = { status: result.taskState };
+      if (result.taskState === 'completed') update.completedAt = Date.now();
+      await db
+        .update(tasks)
+        .set(update)
+        .where(eq(tasks.id, currentTask.id));
     }
 
     send({ type: 'done', agentId });

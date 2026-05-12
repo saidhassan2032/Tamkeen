@@ -116,6 +116,34 @@ export async function generateTasks(
   return tasks;
 }
 
+// ── Chat output schema ────────────────────────────────────────────────────
+
+const ChatScoreSchema = z.object({
+  quality: z.number().int().min(1).max(10),
+  speed: z.number().int().min(1).max(10),
+  communication: z.number().int().min(1).max(10),
+  verdict: z.string(),
+});
+
+const ChatReplySchema = z.object({
+  reply: z.string().describe('ردك للمستخدم بعامية سعودية، 3-4 جمل'),
+  score: ChatScoreSchema.optional(),
+  taskState: z.enum(['started', 'largely', 'completed']),
+});
+
+export interface ChatScore {
+  quality: number;
+  speed: number;
+  communication: number;
+  verdict: string;
+}
+
+export interface StreamReplyResult {
+  text: string;
+  score?: ChatScore;
+  taskState: 'started' | 'largely' | 'completed';
+}
+
 // ── Streaming agent chat reply ────────────────────────────────────────────
 
 export interface HistoryItem {
@@ -160,6 +188,10 @@ function makeSystemPrompt(
   timeRemainingMinutes: number,
   shouldEvaluate: boolean,
 ) {
+  const evalInstruction = shouldEvaluate
+    ? '\n- قيّم أداء المستخدم في حقل score (quality, speed, communication, verdict)'
+    : '';
+
   return `أنت ${agentName}، ${agentRoleTitle} في ${companyContext}.
 
 المستخدم هو ${trackTitle} جديد في أول شهر له في العمل.
@@ -179,15 +211,10 @@ function makeSystemPrompt(
 - إذا أرفق المستخدم ملف أو صورة، علّق عليها بشكل محدد ومفيد (بدون مبالغة)
 - إذا أرفق كود/جدول، راجعه باختصار وقل ما الذي صح وما الذي يحتاج تعديل
 - لا تقترح الانتقال لمهمة أخرى في ردّك، فقط ناقش مشاكل العمل والملاحظات
-${shouldEvaluate ? `
-
-بعد ردك قيّم أداء المستخدم واكتب في النهاية على سطر منفصل:
-SCORE_JSON:{"quality":XX,"speed":XX,"communication":XX,"verdict":"تقييم 2-3 جمل عربية"}` : ''}
-
-في نهاية ردك، قيّم مرحلة إنجاز المهمة واكتب على سطر منفصل:
-- إذا المستخدم ما زال في البداية أو العمل قليل: TASK_STATE:started
-- إذا أغلب العمل تم لكن يحتاج تحسينات: TASK_STATE:largely
-- إذا المهمة منجزة بالكامل وكل المتطلبات تم تلبيتها: TASK_STATE:completed`;
+- حدّد مرحلة إنجاز المهمة في حقل taskState:
+  • started: المستخدم ما زال في البداية أو العمل قليل
+  • largely: أغلب العمل تم لكن يحتاج تحسينات
+  • completed: المهمة منجزة بالكامل${evalInstruction}`;
 }
 
 export async function streamAgentReply(
@@ -203,10 +230,7 @@ export async function streamAgentReply(
   conversationHistory: HistoryItem[],
   shouldEvaluate: boolean,
   onChunk: (text: string) => void,
-  onDone: (fullText: string) => void,
-): Promise<string> {
-  let fullText = '';
-
+): Promise<StreamReplyResult> {
   const safeHistory: HistoryItem[] =
     conversationHistory.length > 0
       ? conversationHistory
@@ -215,6 +239,7 @@ export async function streamAgentReply(
   const result = streamText({
     model: getModel('chat'),
     maxOutputTokens: 600,
+    output: Output.object({ schema: ChatReplySchema, name: 'chat_reply' }),
     system: makeSystemPrompt(
       agentName,
       agentRoleTitle,
@@ -230,13 +255,27 @@ export async function streamAgentReply(
     messages: buildMessages(safeHistory) as any,
   });
 
-  for await (const chunk of result.textStream) {
-    fullText += chunk;
-    onChunk(chunk);
+  let latestReply = '';
+  for await (const partial of result.partialOutputStream) {
+    const reply = (partial as any)?.reply;
+    if (typeof reply === 'string' && reply.length > latestReply.length) {
+      const diff = reply.slice(latestReply.length);
+      latestReply = reply;
+      onChunk(diff);
+    }
   }
 
-  onDone(fullText);
-  return fullText;
+  const finalOutput = (await result.output) as {
+    reply: string;
+    score?: ChatScore;
+    taskState: 'started' | 'largely' | 'completed';
+  };
+
+  return {
+    text: finalOutput.reply,
+    score: finalOutput.score,
+    taskState: finalOutput.taskState,
+  };
 }
 
 // ── Manager guidance hint ─────────────────────────────────────────────────

@@ -127,7 +127,7 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
             </div>
             <div className="rounded-2xl rounded-bl-sm bg-tamkeen-surface px-4 py-3 max-w-2xl border border-tamkeen-border">
               {streamingMessage ? (
-                <MessageContent text={streamingMessage.split('SCORE_JSON:')[0]} />
+                <MessageContent text={streamingMessage} />
               ) : (
                 <div className="flex gap-1.5 py-1">
                   <span className="typing-dot" />
@@ -222,7 +222,7 @@ function AttachmentChip({ attachment, onRemove }: { attachment: Attachment; onRe
 
 function MessageBubble({ message, agent }: { message: Message; agent: Agent }) {
   const isUser = message.role === 'user';
-  const visible = message.content.split('SCORE_JSON:')[0].trim();
+  const visible = message.content.trim();
 
   if (isUser) {
     return (

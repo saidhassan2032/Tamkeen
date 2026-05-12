@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.76",
-    "@ai-sdk/google": "^3.0.71",
+    "@ai-sdk/google": "^3.0.72",
     "@anthropic-ai/sdk": "^0.95.1",
     "@libsql/client": "^0.17.3",
     "@radix-ui/react-dialog": "^1.0.5",
