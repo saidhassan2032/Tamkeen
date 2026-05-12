@@ -9,7 +9,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     const [session, sessionAgents, sessionTasks] = await Promise.all([
       db.select().from(sessions).where(eq(sessions.id, params.id)).get(),
       db.select().from(agents).where(eq(agents.sessionId, params.id)),
-      db.select().from(tasks).where(eq(tasks.sessionId, params.id)).orderBy(tasks.difficulty),
+      db.select().from(tasks).where(eq(tasks.sessionId, params.id)).orderBy(tasks.sortOrder),
     ]);
 
     if (!session) {

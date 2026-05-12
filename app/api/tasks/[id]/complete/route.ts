@@ -31,7 +31,7 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
         .select()
         .from(tasks)
         .where(and(eq(tasks.sessionId, completedTask.sessionId), eq(tasks.status, 'pending')))
-        .orderBy(asc(tasks.difficulty))
+        .orderBy(asc(tasks.sortOrder))
         .get();
 
       if (nextTask) {

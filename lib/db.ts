@@ -56,6 +56,7 @@ export const tasks = sqliteTable('tasks', {
   guidanceTips:       text('guidance_tips').notNull(),
   starterMessage:     text('starter_message'),
   deadlineMinutes:    integer('deadline_minutes').notNull(),
+  sortOrder:          integer('sort_order'),
   status:             text('status').notNull().default('pending'),
   difficulty:         integer('difficulty').notNull(),
   waitingAgentId:     text('waiting_agent_id').notNull(),

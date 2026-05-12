@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
         guidanceTips: JSON.stringify(task.guidanceTips ?? []),
         starterMessage: task.starterMessage ?? null,
         deadlineMinutes: task.deadlineMinutes ?? 15,
+        sortOrder: i + 1,
         status: i === 0 ? 'active' : 'pending',
         difficulty: task.difficulty ?? i + 1,
         waitingAgentId: waiting,
