@@ -40,5 +40,8 @@ next-env.d.ts
 /.claude
 install.cmd
 
+# opencode
+/.opencode
+
 # os
 Thumbs.db
