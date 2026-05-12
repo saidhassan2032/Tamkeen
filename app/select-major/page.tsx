@@ -4,9 +4,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MAJORS } from '@/types';
 import { useSimulationStore } from '@/store/simulationStore';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { Logo } from '@/components/brand/Logo';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { ArrowLeft, Check } from 'lucide-react';
 
 export default function SelectMajorPage() {
   const router = useRouter();
@@ -18,57 +19,58 @@ export default function SelectMajorPage() {
   };
 
   return (
-    <main className="min-h-screen bg-tamkeen-bg text-tamkeen-text">
-      <nav className="border-b border-tamkeen-border">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-tamkeen-blue to-tamkeen-green flex items-center justify-center font-bold">
-              ت
-            </div>
-            <span className="text-lg font-semibold">تمكين</span>
-          </Link>
-          <div className="text-sm text-tamkeen-muted">الخطوة 1 من 3</div>
+    <main className="min-h-screen bg-bg text-text">
+      <nav className="border-b border-border">
+        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Logo asLink withWordmark size={44} />
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-text-muted">الخطوة 1 من 3</span>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl md:text-4xl font-bold mb-3">اختر تخصصك</h1>
-          <p className="text-tamkeen-muted">حدّد المجال الذي يصف خلفيتك التعليمية أو اهتمامك المهني</p>
+      <div className="max-w-4xl mx-auto px-6 py-16">
+        <div className="mb-12">
+          <h1 className="text-3xl md:text-4xl font-bold mb-3 tracking-tight">اختر تخصصك</h1>
+          <p className="text-sm text-text-muted">حدّد المجال الذي يصف خلفيتك التعليمية أو اهتمامك المهني.</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-5">
+        <div className="grid md:grid-cols-2 gap-3">
           {MAJORS.map((major) => {
             const isSelected = selectedMajorId === major.id;
             return (
-              <Card
+              <button
                 key={major.id}
                 onClick={() => handleSelect(major.id)}
-                className={`p-7 cursor-pointer transition-all hover:border-tamkeen-blue hover:scale-[1.01] ${
-                  isSelected ? 'border-tamkeen-blue ring-2 ring-tamkeen-blue/30' : ''
+                className={`group relative text-right p-6 rounded-xl border bg-surface transition-all ${
+                  isSelected
+                    ? 'border-brand bg-brand-soft'
+                    : 'border-border hover:border-brand/40 hover:bg-surface2'
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  <div
-                    className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl shrink-0"
-                    style={{ backgroundColor: `${major.color}22` }}
-                  >
-                    {major.icon}
+                  <div className="text-2xl shrink-0">{major.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold mb-1.5">{major.title}</h3>
+                    <p className="text-sm text-text-secondary leading-relaxed">{major.description}</p>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-2">{major.title}</h3>
-                    <p className="text-sm text-tamkeen-muted leading-relaxed">{major.description}</p>
+                  <div className="shrink-0 self-center">
+                    {isSelected ? (
+                      <Check className="w-5 h-5 text-brand" />
+                    ) : (
+                      <ArrowLeft className="w-4 h-4 text-text-muted group-hover:text-brand transition-colors" />
+                    )}
                   </div>
-                  <ArrowRight className="w-5 h-5 text-tamkeen-muted rotate-180 mt-2" />
                 </div>
-              </Card>
+              </button>
             );
           })}
         </div>
 
-        <div className="mt-10 flex justify-between">
+        <div className="mt-12 flex justify-end">
           <Link href="/">
-            <Button variant="ghost">رجوع</Button>
+            <Button variant="ghost">رجوع للرئيسية</Button>
           </Link>
         </div>
       </div>

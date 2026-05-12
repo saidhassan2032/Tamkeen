@@ -25,24 +25,25 @@ export function ResourcesPanel({ resources }: Props) {
 
   if (!resources.length) {
     return (
-      <div className="p-4 border-b border-tamkeen-border">
-        <h3 className="text-sm font-semibold text-tamkeen-muted">الموارد</h3>
-        <p className="text-xs text-tamkeen-muted mt-2">لا توجد موارد لهذه المهمة</p>
+      <div className="p-5 border-b border-border">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">الموارد</h3>
+        <p className="text-xs text-text-muted mt-2">لا توجد موارد لهذه المهمة</p>
       </div>
     );
   }
 
   return (
-    <div className="border-b border-tamkeen-border">
-      <div className="px-4 py-3 border-b border-tamkeen-border">
-        <h3 className="text-sm font-semibold text-tamkeen-muted">الموارد ({resources.length})</h3>
+    <div className="border-b border-border">
+      <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-text-muted">الموارد</h3>
+        <span className="text-xs text-text-muted">{resources.length}</span>
       </div>
       <div className="max-h-[280px] overflow-y-auto">
         {resources.map((resource, i) => {
           const Icon = ICON[resource.type] ?? FileText;
           const isOpen = openIndices.has(i);
           return (
-            <div key={i} className="border-b border-tamkeen-border last:border-b-0">
+            <div key={i} className="border-b border-border last:border-b-0">
               <button
                 onClick={() => {
                   setOpenIndices(prev => {
@@ -52,19 +53,19 @@ export function ResourcesPanel({ resources }: Props) {
                     return next;
                   });
                 }}
-                className="w-full px-4 py-2.5 flex items-center justify-between gap-2 hover:bg-tamkeen-surface2 transition-colors text-right"
+                className="w-full px-5 py-2.5 flex items-center justify-between gap-2 hover:bg-surface2 transition-colors text-right"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Icon className="w-4 h-4 text-tamkeen-blue shrink-0" />
+                  <Icon className="w-3.5 h-3.5 text-brand shrink-0" />
                   <span className="text-xs font-medium truncate">{resource.name}</span>
                 </div>
-                <ChevronDown className={cn('w-4 h-4 text-tamkeen-muted transition-transform shrink-0', isOpen && 'rotate-180')} />
+                <ChevronDown className={cn('w-3.5 h-3.5 text-text-muted transition-transform shrink-0', isOpen && 'rotate-180')} />
               </button>
               {isOpen && (
-                <div className="px-4 pb-3 pt-1">
-                  <div className="text-xs text-tamkeen-muted leading-relaxed whitespace-pre-wrap bg-tamkeen-bg p-3 rounded-md border border-tamkeen-border">
+                <div className="px-5 pb-3">
+                  <pre className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap bg-bg p-3 rounded-md border border-border font-sans">
                     {resource.content}
-                  </div>
+                  </pre>
                 </div>
               )}
             </div>

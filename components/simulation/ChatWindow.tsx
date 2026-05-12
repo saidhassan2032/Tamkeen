@@ -92,23 +92,23 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
   const canSend = (input.trim() || pendingAttachments.length) && !disabled && !isTyping && !uploading;
 
   return (
-    <div className="h-full flex flex-col bg-tamkeen-bg min-w-0 min-h-0">
-      <div className="border-b border-tamkeen-border bg-tamkeen-surface px-6 py-4 flex items-center gap-3 shrink-0">
+    <div className="h-full flex flex-col bg-bg min-w-0 min-h-0">
+      <div className="border-b border-border bg-surface px-6 h-14 flex items-center gap-3 shrink-0">
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+          className="w-9 h-9 rounded-full flex items-center justify-center text-lg"
           style={{ backgroundColor: agent.avatarBg, color: agent.avatarColor }}
         >
           {agent.icon}
         </div>
-        <div>
-          <div className="font-semibold">{agent.name}</div>
-          <div className="text-xs text-tamkeen-muted">{agent.roleTitle}</div>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">{agent.name}</div>
+          <div className="text-xs text-text-muted truncate">{agent.roleTitle}</div>
         </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-4">
         {messages.length === 0 && !isTyping && (
-          <div className="h-full flex items-center justify-center text-tamkeen-muted text-sm text-center">
+          <div className="h-full flex items-center justify-center text-text-muted text-sm text-center">
             ابدأ المحادثة مع {agent.name}
           </div>
         )}
@@ -125,7 +125,7 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
             >
               {agent.icon}
             </div>
-            <div className="rounded-2xl rounded-bl-sm bg-tamkeen-surface px-4 py-3 max-w-2xl border border-tamkeen-border">
+            <div className="rounded-2xl rounded-bl-sm bg-surface px-4 py-3 max-w-2xl border border-border">
               {streamingMessage ? (
                 <MessageContent text={streamingMessage} />
               ) : (
@@ -140,7 +140,7 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
         )}
       </div>
 
-      <div className="border-t border-tamkeen-border bg-tamkeen-surface p-4 shrink-0 space-y-2">
+      <div className="border-t border-border bg-surface p-4 shrink-0 space-y-2">
         {pendingAttachments.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {pendingAttachments.map((att, i) => (
@@ -150,7 +150,7 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
         )}
 
         {uploadError && (
-          <div className="text-xs text-tamkeen-red bg-tamkeen-red/10 border border-tamkeen-red/30 rounded-md px-3 py-2">
+          <div className="text-xs text-danger bg-danger/10 border border-danger/30 rounded-md px-3 py-2">
             {uploadError}
           </div>
         )}
@@ -183,7 +183,7 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
             disabled={disabled || isTyping}
             placeholder={`اكتب رسالتك إلى ${agent.name}...`}
             rows={1}
-            className="flex-1 resize-none bg-tamkeen-bg border border-tamkeen-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-tamkeen-blue disabled:opacity-50 max-h-32"
+            className="flex-1 resize-none bg-bg border border-border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand disabled:opacity-50 max-h-32"
             style={{ fieldSizing: 'content' } as any}
           />
           <Button onClick={handleSend} disabled={!canSend} size="icon" className="shrink-0">
@@ -202,18 +202,18 @@ function AttachmentChip({ attachment, onRemove }: { attachment: Attachment; onRe
     : null;
 
   return (
-    <div className="flex items-center gap-2 bg-tamkeen-surface2 border border-tamkeen-border rounded-lg pl-2 pr-3 py-1.5 max-w-[220px]">
+    <div className="flex items-center gap-2 bg-surface2 border border-border rounded-lg pl-2 pr-3 py-1.5 max-w-[220px]">
       {preview ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={preview} alt={attachment.name} className="w-7 h-7 rounded object-cover shrink-0" />
       ) : (
-        <Icon className="w-4 h-4 text-tamkeen-blue shrink-0" />
+        <Icon className="w-4 h-4 text-brand shrink-0" />
       )}
       <div className="min-w-0 flex-1">
         <div className="text-xs truncate">{attachment.name}</div>
-        <div className="text-[10px] text-tamkeen-muted">{formatFileSize(attachment.size)}</div>
+        <div className="text-[10px] text-text-muted">{formatFileSize(attachment.size)}</div>
       </div>
-      <button onClick={onRemove} className="text-tamkeen-muted hover:text-tamkeen-red transition-colors shrink-0">
+      <button onClick={onRemove} className="text-text-muted hover:text-danger transition-colors shrink-0">
         <X className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -227,10 +227,10 @@ function MessageBubble({ message, agent }: { message: Message; agent: Agent }) {
   if (isUser) {
     return (
       <div className="flex gap-3 items-end justify-end">
-        <div className="rounded-2xl rounded-br-sm bg-tamkeen-blue px-4 py-3 max-w-2xl text-white">
+        <div className="rounded-2xl rounded-br-sm bg-brand text-brand-fg px-4 py-3 max-w-2xl">
           <MessageContent text={visible} attachments={message.attachments} light />
         </div>
-        <div className="w-8 h-8 rounded-full bg-tamkeen-surface2 flex items-center justify-center text-sm shrink-0">
+        <div className="w-8 h-8 rounded-full bg-surface2 border border-border flex items-center justify-center text-xs shrink-0">
           أنا
         </div>
       </div>
@@ -245,7 +245,7 @@ function MessageBubble({ message, agent }: { message: Message; agent: Agent }) {
       >
         {agent.icon}
       </div>
-      <div className="rounded-2xl rounded-bl-sm bg-tamkeen-surface px-4 py-3 max-w-2xl border border-tamkeen-border">
+      <div className="rounded-2xl rounded-bl-sm bg-surface px-4 py-3 max-w-2xl border border-border">
         <MessageContent text={visible} attachments={message.attachments} />
       </div>
     </div>

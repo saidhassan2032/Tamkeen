@@ -19,7 +19,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { LoadingMark } from '@/components/brand/LoadingMark';
 import Link from 'next/link';
 import type { Attachment } from '@/types';
 
@@ -309,21 +309,18 @@ export default function SimulationPage() {
 
   if (loading) {
     return (
-      <main className="h-screen bg-tamkeen-bg flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-tamkeen-blue mx-auto mb-3" />
-          <div className="text-tamkeen-muted">جاري تحميل بيئة العمل...</div>
-        </div>
+      <main className="h-screen bg-bg flex items-center justify-center">
+        <LoadingMark size={120} label="جاري تحميل بيئة العمل..." />
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="h-screen bg-tamkeen-bg flex items-center justify-center">
+      <main className="h-screen bg-bg flex items-center justify-center">
         <div className="text-center max-w-md p-8">
           <div className="text-4xl mb-4">⚠️</div>
-          <div className="text-tamkeen-red mb-4">{error}</div>
+          <div className="text-danger mb-4">{error}</div>
           <Link href="/">
             <Button variant="outline">العودة للرئيسية</Button>
           </Link>
@@ -334,7 +331,7 @@ export default function SimulationPage() {
 
   if (!activeAgent || !currentTask) {
     return (
-      <main className="h-screen bg-tamkeen-bg flex items-center justify-center">
+      <main className="h-screen bg-bg flex items-center justify-center">
         <div className="text-center max-w-md p-8">
           <div className="text-4xl mb-4">🎉</div>
           <div className="text-lg mb-4">انتهت كل المهام</div>
@@ -363,20 +360,20 @@ export default function SimulationPage() {
   const messages = conversations[activeAgent.id] ?? [];
 
   return (
-    <main className="h-screen bg-tamkeen-bg text-tamkeen-text overflow-hidden">
+    <main className="h-screen bg-bg text-text overflow-hidden">
       {notification && (
         <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-lg shadow-lg border text-sm font-medium ${
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full shadow-soft border text-sm font-medium ${
             notification.type === 'danger'
-              ? 'bg-tamkeen-red/20 border-tamkeen-red/50 text-tamkeen-red'
-              : 'bg-tamkeen-amber/20 border-tamkeen-amber/50 text-tamkeen-amber'
+              ? 'bg-danger/10 border-danger/40 text-danger'
+              : 'bg-warning/10 border-warning/40 text-warning'
           }`}
         >
           {notification.message}
         </div>
       )}
 
-      <div className="h-full grid grid-cols-[240px_1fr_300px] min-h-0">
+      <div className="h-full grid grid-cols-[260px_1fr_320px] min-h-0">
         <AgentsSidebar
           agents={agents}
           activeAgentId={activeAgent.id}
@@ -393,7 +390,7 @@ export default function SimulationPage() {
           onSend={handleSend}
         />
 
-        <aside className="border-r border-tamkeen-border bg-tamkeen-surface flex flex-col overflow-y-auto min-h-0 h-full">
+        <aside className="border-r border-border bg-surface flex flex-col overflow-y-auto min-h-0 h-full">
           <TaskPanel
             task={currentTask}
             timeRemaining={timeRemaining}
@@ -415,7 +412,7 @@ export default function SimulationPage() {
             </DialogTitle>
             <DialogDescription className="text-right">
               <p className="mb-3 text-sm">{blockedDialog?.feedback}</p>
-              <p className="text-xs text-tamkeen-amber font-medium">{blockedDialog?.skipWarning}</p>
+              <p className="text-xs text-warning font-medium">{blockedDialog?.skipWarning}</p>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">

@@ -15,11 +15,38 @@ const config: Config = {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        // Map to CSS variables — single source of truth lives in globals.css
+        bg:        'hsl(var(--bg))',
+        surface:   'hsl(var(--surface))',
+        surface2:  'hsl(var(--surface-2))',
+        border:    'hsl(var(--border))',
+        input:     'hsl(var(--input))',
+        ring:      'hsl(var(--ring))',
+        foreground: 'hsl(var(--text))',
+        background: 'hsl(var(--bg))',
+
+        text: {
+          DEFAULT:   'hsl(var(--text))',
+          secondary: 'hsl(var(--text-2))',
+          muted:     'hsl(var(--text-muted))',
+        },
+
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          fg:      'hsl(var(--brand-fg))',
+          soft:    'hsl(var(--brand-soft))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          fg:      'hsl(var(--accent-fg))',
+          soft:    'hsl(var(--accent-soft))',
+        },
+
+        success: 'hsl(var(--success))',
+        warning: 'hsl(var(--warning))',
+        danger:  'hsl(var(--danger))',
+
+        // shadcn primitive aliases (so existing primitives keep working)
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
@@ -36,10 +63,6 @@ const config: Config = {
           DEFAULT: 'hsl(var(--muted))',
           foreground: 'hsl(var(--muted-foreground))',
         },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
         popover: {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
@@ -48,18 +71,20 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+
+        // Legacy alias — keep until all references are migrated
         tamkeen: {
-          bg: '#0D1117',
-          surface: '#161B22',
-          surface2: '#21262D',
-          border: '#30363D',
-          text: '#F0F6FC',
-          muted: '#8B949E',
-          blue: '#388BFD',
-          green: '#3FB950',
-          amber: '#D29922',
-          red: '#F85149',
-          gold: '#E3B341',
+          bg:       'hsl(var(--bg))',
+          surface:  'hsl(var(--surface))',
+          surface2: 'hsl(var(--surface-2))',
+          border:   'hsl(var(--border))',
+          text:     'hsl(var(--text))',
+          muted:    'hsl(var(--text-muted))',
+          blue:     'hsl(var(--brand))',
+          green:    'hsl(var(--success))',
+          amber:    'hsl(var(--warning))',
+          red:      'hsl(var(--danger))',
+          gold:     'hsl(var(--accent))',
         },
       },
       borderRadius: {
@@ -70,19 +95,23 @@ const config: Config = {
       fontFamily: {
         sans: ['var(--font-arabic)', 'IBM Plex Sans Arabic', 'Cairo', 'sans-serif'],
       },
+      boxShadow: {
+        soft: '0 1px 2px hsl(var(--text) / 0.04), 0 4px 16px hsl(var(--text) / 0.04)',
+        glow: '0 0 0 1px hsl(var(--brand) / 0.15), 0 8px 24px hsl(var(--brand) / 0.12)',
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' },
+          to:   { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
           from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' },
+          to:   { height: '0' },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out',
+        'accordion-up':   'accordion-up 0.2s ease-out',
       },
     },
   },

@@ -32,35 +32,33 @@ export function TaskPanel({ task, timeRemaining, totalTasks, completedTasks, onC
   const isWarning = timeRemaining > 2 * 60 * 1000 && timeRemaining < 5 * 60 * 1000;
   const expired = timeRemaining === 0;
 
+  const timeTone = expired || isUrgent ? 'text-danger' : isWarning ? 'text-warning' : 'text-text-muted';
+  const timeValueTone = expired || isUrgent ? 'text-danger' : isWarning ? 'text-warning' : 'text-text';
+  const barTone = isUrgent || expired ? '[&>div]:bg-danger' : isWarning ? '[&>div]:bg-warning' : '';
+
   return (
-    <div className="border-b border-tamkeen-border bg-tamkeen-surface p-4">
-      <div className="flex items-center justify-between mb-3">
-        <Badge variant="secondary" className="text-xs">
+    <div className="border-b border-border bg-surface p-5">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-[10px] uppercase tracking-wider text-text-muted">
           مهمة {completedTasks + 1} من {totalTasks}
-        </Badge>
-        <Badge variant="outline" className="text-xs">
-          صعوبة {task.difficulty}/5
-        </Badge>
+        </span>
+        <Badge variant="outline" className="text-[10px]">صعوبة {task.difficulty}/5</Badge>
       </div>
 
-      <h3 className="font-semibold text-base mb-2 leading-tight">{task.title}</h3>
-      <p className="text-xs text-tamkeen-muted leading-relaxed mb-4">{task.description}</p>
+      <h3 className="font-semibold text-base mb-2 leading-snug">{task.title}</h3>
+      <p className="text-xs text-text-secondary leading-relaxed mb-4">{task.description}</p>
 
       <div className="space-y-2 mb-4">
         <div className="flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5">
-            <Clock className={`w-3.5 h-3.5 ${expired ? 'text-tamkeen-red' : isUrgent ? 'text-tamkeen-red' : isWarning ? 'text-tamkeen-amber' : 'text-tamkeen-muted'}`} />
-            <span
-              className={`font-mono ${
-                expired || isUrgent ? 'text-tamkeen-red' : isWarning ? 'text-tamkeen-amber' : 'text-tamkeen-text'
-              }`}
-            >
+            <Clock className={`w-3.5 h-3.5 ${timeTone}`} />
+            <span className={`font-mono tabular-nums ${timeValueTone}`}>
               {expired ? 'انتهى الوقت' : formatTime(timeRemaining)}
             </span>
           </div>
-          <span className="text-tamkeen-muted">من {task.deadlineMinutes} دقيقة</span>
+          <span className="text-text-muted">من {task.deadlineMinutes} دقيقة</span>
         </div>
-        <Progress value={progress} className={isUrgent ? '[&>div]:bg-tamkeen-red' : isWarning ? '[&>div]:bg-tamkeen-amber' : ''} />
+        <Progress value={progress} className={barTone} />
       </div>
 
       <Button onClick={onComplete} disabled={isCompleting} className="w-full" size="sm">

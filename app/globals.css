@@ -2,111 +2,151 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 220 13% 7%;
-    --foreground: 213 31% 96%;
-    --card: 215 14% 11%;
-    --card-foreground: 213 31% 96%;
-    --popover: 215 14% 11%;
-    --popover-foreground: 213 31% 96%;
-    --primary: 213 94% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 215 14% 14%;
-    --secondary-foreground: 213 31% 96%;
-    --muted: 215 14% 14%;
-    --muted-foreground: 213 9% 58%;
-    --accent: 215 14% 14%;
-    --accent-foreground: 213 31% 96%;
-    --destructive: 0 88% 63%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 11% 21%;
-    --input: 215 11% 21%;
-    --ring: 213 94% 60%;
-    --radius: 0.75rem;
-  }
-}
+/*
+  Tamkeen design tokens
+  Two themes (light = default, dark via .dark on <html>)
+  Brand palette derived from the logo:
+    - Navy   #1F1B98  (primary text / brand)
+    - Orange #FF6A00  (accent)
+*/
 
 @layer base {
-  * {
-    @apply border-border;
+  :root {
+    /* surfaces */
+    --bg:           0 0% 100%;          /* page background */
+    --surface:      220 22% 98%;        /* cards / panels */
+    --surface-2:    220 18% 95%;        /* sunken / hover */
+    --border:       220 16% 90%;        /* hairlines */
+
+    /* text */
+    --text:         241 71% 18%;        /* primary text — derived from #1F1B98 */
+    --text-2:       222 14% 32%;        /* secondary text */
+    --text-muted:   220 9% 50%;         /* muted */
+
+    /* brand */
+    --brand:        241 71% 35%;        /* #1F1B98 navy */
+    --brand-fg:     0 0% 100%;
+    --brand-soft:   241 71% 96%;        /* faint navy tint */
+
+    /* accent */
+    --accent:       24 100% 50%;        /* #FF6A00 orange */
+    --accent-fg:    0 0% 100%;
+    --accent-soft:  24 100% 96%;
+
+    /* semantic */
+    --success:      152 64% 38%;
+    --warning:      38 92% 50%;
+    --danger:       0 73% 51%;
+
+    /* shadcn-compat aliases */
+    --background:           var(--bg);
+    --foreground:           var(--text);
+    --card:                 var(--surface);
+    --card-foreground:      var(--text);
+    --popover:              var(--surface);
+    --popover-foreground:   var(--text);
+    --primary:              var(--brand);
+    --primary-foreground:   var(--brand-fg);
+    --secondary:            var(--surface-2);
+    --secondary-foreground: var(--text);
+    --muted:                var(--surface-2);
+    --muted-foreground:     var(--text-muted);
+    --accent-foreground:    var(--accent-fg);
+    --destructive:          var(--danger);
+    --destructive-foreground: 0 0% 100%;
+    --input:                var(--border);
+    --ring:                 var(--brand);
+    --radius: 0.75rem;
   }
+
+  .dark {
+    --bg:           240 36% 7%;         /* #0B0C1F deep navy black */
+    --surface:      240 30% 11%;        /* #15172A */
+    --surface-2:    240 24% 16%;        /* #1F213A */
+    --border:       240 18% 22%;
+
+    --text:         220 30% 96%;
+    --text-2:       222 14% 75%;
+    --text-muted:   220 9% 60%;
+
+    --brand:        241 75% 70%;        /* lighter navy for dark mode contrast */
+    --brand-fg:     240 36% 7%;
+    --brand-soft:   240 30% 16%;
+
+    --accent:       24 100% 58%;        /* slightly brighter orange */
+    --accent-fg:    0 0% 100%;
+    --accent-soft:  24 60% 18%;
+
+    --success:      152 60% 50%;
+    --warning:      38 92% 60%;
+    --danger:       0 73% 60%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
   html,
   body {
-    background-color: #0d1117;
-    color: #f0f6fc;
+    background: hsl(var(--bg));
+    color: hsl(var(--text));
     direction: rtl;
   }
+
   body {
     font-family: 'IBM Plex Sans Arabic', 'Cairo', 'Tajawal', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Smooth theme transition (but not on page load) */
+  html.theme-ready *,
+  html.theme-ready *::before,
+  html.theme-ready *::after {
+    transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
   }
 }
 
+/* ────────────────────────────────────────────────────────────── */
+/* Typing indicator (chat) */
 .typing-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #8b949e;
+  background: hsl(var(--text-muted));
   animation: typing 1.2s infinite;
   display: inline-block;
 }
-.typing-dot:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.typing-dot:nth-child(3) {
-  animation-delay: 0.4s;
-}
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes typing {
-  0%,
-  80%,
-  100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
+  0%, 80%, 100% { opacity: 0.3; transform: scale(1); }
+  40%           { opacity: 1;   transform: scale(1.2); }
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #388bfd 0%, #3fb950 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* Soft pulsing glow for the loading mark */
+@keyframes mark-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.95; }
+  50%      { transform: scale(1.06); opacity: 1; }
+}
+.mark-pulse {
+  animation: mark-pulse 1.8s ease-in-out infinite;
 }
 
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(56, 139, 253, 0) 0%,
-    rgba(56, 139, 253, 0.15) 50%,
-    rgba(56, 139, 253, 0) 100%
+/* Scrollbar */
+::-webkit-scrollbar      { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--text-muted) / 0.5); }
+
+/* Selection */
+::selection { background: hsl(var(--accent) / 0.25); color: hsl(var(--text)); }
+
+/* Subtle radial-gradient that uses brand colors (for hero accents) */
+.brand-glow {
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    hsl(var(--brand) / 0.12) 0%,
+    transparent 60%
   );
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite linear;
-}
-@keyframes shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #0d1117;
-}
-::-webkit-scrollbar-thumb {
-  background: #30363d;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #484f58;
 }
