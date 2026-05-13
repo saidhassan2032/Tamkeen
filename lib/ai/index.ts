@@ -119,9 +119,9 @@ export async function generateTasks(
 // ── Chat output schema ────────────────────────────────────────────────────
 
 const ChatScoreSchema = z.object({
-  quality: z.number().int().min(1).max(10),
-  speed: z.number().int().min(1).max(10),
-  communication: z.number().int().min(1).max(10),
+  quality: z.number().int().min(1).max(10).catch(0),
+  speed: z.number().int().min(1).max(10).catch(0),
+  communication: z.number().int().min(1).max(10).catch(0),
   verdict: z.string(),
 });
 
