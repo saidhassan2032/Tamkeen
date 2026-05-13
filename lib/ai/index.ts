@@ -256,20 +256,38 @@ export async function streamAgentReply(
   });
 
   let latestReply = '';
-  for await (const partial of result.partialOutputStream) {
-    const reply = (partial as any)?.reply;
-    if (typeof reply === 'string' && reply.length > latestReply.length) {
-      const diff = reply.slice(latestReply.length);
-      latestReply = reply;
-      onChunk(diff);
-    }
-  }
-
-  const finalOutput = (await result.output) as {
+  let finalOutput: {
     reply: string;
     score?: ChatScore;
     taskState: 'started' | 'largely' | 'completed';
   };
+
+  try {
+    for await (const partial of result.partialOutputStream) {
+      const reply = (partial as any)?.reply;
+      if (typeof reply === 'string' && reply.length > latestReply.length) {
+        const diff = reply.slice(latestReply.length);
+        latestReply = reply;
+        onChunk(diff);
+      }
+    }
+
+    finalOutput = (await result.output) as {
+      reply: string;
+      score?: ChatScore;
+      taskState: 'started' | 'largely' | 'completed';
+    };
+  } catch (err: any) {
+    console.error('[streamAgentReply] Error:', err?.message ?? err);
+    if (err?.name === 'AI_NoObjectGeneratedError' || err?.name === 'NoObjectGeneratedError') {
+      console.error('[streamAgentReply] Raw model text:', err.text);
+      console.error('[streamAgentReply] Finish reason:', err.finishReason);
+      console.error('[streamAgentReply] Cause:', err.cause);
+    } else {
+      console.error('[streamAgentReply] Stack:', err?.stack);
+    }
+    throw err;
+  }
 
   return {
     text: finalOutput.reply,

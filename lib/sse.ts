@@ -16,7 +16,9 @@ export function createSSEStream(
       };
       try {
         await handler(send, close);
-      } catch (err) {
+      } catch (err: any) {
+        console.error('[createSSEStream] Unhandled error:', err?.message ?? err);
+        console.error('[createSSEStream] Stack:', err?.stack);
         send({ type: 'error', message: 'حدث خطأ في الاتصال، حاول مجدداً' });
         close();
       }
