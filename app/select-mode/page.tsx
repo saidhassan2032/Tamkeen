@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/brand/Logo';
 import { LoadingMark } from '@/components/brand/LoadingMark';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { Zap, Calendar } from 'lucide-react';
+import { AuthNav } from '@/components/auth/AuthNav';
+import { Zap, Calendar, Lock } from 'lucide-react';
 
 export default function SelectModePage() {
   const router = useRouter();
@@ -21,16 +22,32 @@ export default function SelectModePage() {
   } = useSimulationStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
     if (!selectedTrackId) router.replace('/select-track');
   }, [selectedTrackId, router]);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.json())
+      .then((data) => setIsAuthed(!!data.user))
+      .catch(() => setIsAuthed(false))
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   if (!selectedTrackId || !selectedMajorId) return null;
 
   const trackTitle = TRACK_TITLES[selectedTrackId] ?? selectedTrackId;
 
   async function startSession(mode: 'quick' | 'extended') {
+    if (mode === 'extended' && !isAuthed) {
+      const next = encodeURIComponent('/select-mode');
+      router.push(`/login?next=${next}`);
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {
@@ -45,6 +62,11 @@ export default function SelectModePage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          const next = encodeURIComponent('/select-mode');
+          router.push(`/login?next=${next}`);
+          return;
+        }
         throw new Error(data.error ?? 'حدث خطأ في الاتصال، حاول مجدداً');
       }
       const { sessionId } = await res.json();
@@ -72,6 +94,7 @@ export default function SelectModePage() {
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-muted">الخطوة 3 من 3</span>
             <ThemeToggle />
+            <AuthNav />
           </div>
         </div>
       </nav>
@@ -93,23 +116,29 @@ export default function SelectModePage() {
             </div>
             <h3 className="text-base font-semibold mb-1.5">محاكاة سريعة</h3>
             <p className="text-sm text-text-secondary leading-relaxed mb-4">
-              3 مهام أساسية، حوالي 15-20 دقيقة. مثالية لتجربة المنصّة.
+              3 مهام أساسية، حوالي 15-20 دقيقة. مثالية لتجربة المنصّة — بدون تسجيل.
             </p>
             <Badge variant="outline">~ 20 دقيقة</Badge>
           </button>
 
           <button
             onClick={() => startSession('extended')}
-            className="text-right p-6 rounded-xl border border-border bg-surface hover:border-brand/40 hover:bg-surface2 transition-all"
+            className="relative text-right p-6 rounded-xl border border-border bg-surface hover:border-brand/40 hover:bg-surface2 transition-all"
           >
+            {authChecked && !isAuthed && (
+              <div className="absolute top-4 left-4 inline-flex items-center gap-1 text-[11px] text-text-muted">
+                <Lock className="w-3 h-3" />
+                يتطلب حساباً
+              </div>
+            )}
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center mb-4">
               <Calendar className="w-5 h-5 text-accent" />
             </div>
             <h3 className="text-base font-semibold mb-1.5">محاكاة موسّعة</h3>
             <p className="text-sm text-text-secondary leading-relaxed mb-4">
-              تجربة عميقة مع 5 مهام متصاعدة. مثالية للاستعداد للواقع.
+              تجربة عميقة على مدى أسبوع مع 5 مهام متصاعدة — نحفظ تقدّمك في حسابك.
             </p>
-            <Badge variant="outline">~ 30 دقيقة</Badge>
+            <Badge variant="outline">أسبوع كامل</Badge>
           </button>
         </div>
 

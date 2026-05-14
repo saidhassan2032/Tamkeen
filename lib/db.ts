@@ -22,8 +22,26 @@ export const db = new Proxy({} as LibSQLDatabase, {
   },
 });
 
+export const users = sqliteTable('users', {
+  id:           text('id').primaryKey(),
+  email:        text('email').notNull().unique(),
+  name:         text('name').notNull(),
+  passwordHash: text('password_hash'),
+  googleId:     text('google_id'),
+  avatarUrl:    text('avatar_url'),
+  createdAt:    integer('created_at').notNull(),
+});
+
+export const userSessions = sqliteTable('user_sessions', {
+  id:        text('id').primaryKey(),
+  userId:    text('user_id').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  createdAt: integer('created_at').notNull(),
+});
+
 export const sessions = sqliteTable('sessions', {
   id:             text('id').primaryKey(),
+  userId:         text('user_id'),
   trackId:        text('track_id').notNull(),
   majorId:        text('major_id').notNull(),
   mode:           text('mode').notNull(),
@@ -100,3 +118,5 @@ export type Agent = typeof agents.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Report = typeof reports.$inferSelect;
+export type User = typeof users.$inferSelect;
+export type UserSession = typeof userSessions.$inferSelect;

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/Logo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { AuthNav } from '@/components/auth/AuthNav';
 import { ArrowLeft } from 'lucide-react';
 
 const FEATURES = [
@@ -40,6 +41,7 @@ export default function LandingPage() {
           <Logo asLink withWordmark size={44} />
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            <AuthNav />
             <Link href="/select-major">
               <Button size="sm">ابدأ المحاكاة</Button>
             </Link>

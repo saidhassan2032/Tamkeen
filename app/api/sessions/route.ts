@@ -3,6 +3,7 @@ import { db, sessions, agents, tasks, messages } from '@/lib/db';
 import { generateOneTask } from '@/lib/claude';
 import { AGENT_TEMPLATES } from '@/types';
 import { randomUUID } from 'crypto';
+import { getCurrentUser } from '@/lib/auth';
 
 export const maxDuration = 90;
 export const runtime = 'nodejs';
@@ -20,11 +21,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'مسار غير موجود' }, { status: 400 });
     }
 
+    const user = await getCurrentUser();
+    if (mode === 'extended' && !user) {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول لبدء المحاكاة الموسّعة' },
+        { status: 401 },
+      );
+    }
+
     const totalTasks = mode === 'quick' ? 3 : 5;
     const sessionId = randomUUID();
 
     await db.insert(sessions).values({
       id: sessionId,
+      userId: user?.id ?? null,
       trackId,
       majorId,
       mode,
