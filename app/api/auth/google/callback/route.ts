@@ -8,6 +8,7 @@ import { createSession } from '@/lib/auth';
 export const runtime = 'nodejs';
 
 const STATE_COOKIE = 'tamkeen_oauth_state';
+const NEXT_COOKIE = 'tamkeen_oauth_next';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
@@ -29,7 +30,15 @@ export async function GET(req: NextRequest) {
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const savedState = cookieStore.get(STATE_COOKIE)?.value;
+  const savedNext = cookieStore.get(NEXT_COOKIE)?.value;
   cookieStore.delete(STATE_COOKIE);
+  cookieStore.delete(NEXT_COOKIE);
+
+  // Only honor relative same-origin destinations.
+  const nextPath =
+    savedNext && savedNext.startsWith('/') && !savedNext.startsWith('//')
+      ? savedNext
+      : '/dashboard';
 
   if (!code || !state || state !== savedState) {
     return errorRedirect(baseUrl, 'فشل التحقق من Google');
@@ -96,7 +105,7 @@ export async function GET(req: NextRequest) {
     }
 
     await createSession(userId!);
-    return NextResponse.redirect(`${baseUrl}/select-major`);
+    return NextResponse.redirect(new URL(nextPath, baseUrl).toString());
   } catch (err) {
     console.error('Google OAuth callback failed', err);
     return errorRedirect(baseUrl, 'فشل تسجيل الدخول عبر Google');

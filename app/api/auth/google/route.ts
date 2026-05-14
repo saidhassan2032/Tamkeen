@@ -6,6 +6,7 @@ export const runtime = 'nodejs';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const STATE_COOKIE = 'tamkeen_oauth_state';
+const NEXT_COOKIE = 'tamkeen_oauth_next';
 
 function getBaseUrl(req: NextRequest) {
   return process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/$/, '') ?? new URL(req.url).origin;
@@ -20,14 +21,31 @@ export async function GET(req: NextRequest) {
   const baseUrl = getBaseUrl(req);
   const redirectUri = `${baseUrl}/api/auth/google/callback`;
   const state = randomBytes(16).toString('hex');
+  const cookieStore = cookies();
 
-  cookies().set(STATE_COOKIE, state, {
+  cookieStore.set(STATE_COOKIE, state, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 10,
   });
+
+  // Carry the post-login destination across the OAuth round-trip via cookie.
+  // Only same-origin relative paths starting with '/' are accepted.
+  const rawNext = new URL(req.url).searchParams.get('next');
+  if (rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')) {
+    cookieStore.set(NEXT_COOKIE, rawNext, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 10,
+    });
+  } else {
+    // Stale cookie from an earlier attempt would otherwise hijack this flow.
+    cookieStore.delete(NEXT_COOKIE);
+  }
 
   const url = new URL(GOOGLE_AUTH_URL);
   url.searchParams.set('client_id', clientId);

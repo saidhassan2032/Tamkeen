@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSimulationStore } from '@/store/simulationStore';
@@ -24,6 +24,7 @@ export default function SelectModePage() {
   const [error, setError] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
+  const autostartedRef = useRef(false);
 
   useEffect(() => {
     if (!selectedTrackId) router.replace('/select-track');
@@ -37,14 +38,11 @@ export default function SelectModePage() {
       .finally(() => setAuthChecked(true));
   }, []);
 
-  if (!selectedTrackId || !selectedMajorId) return null;
-
-  const trackTitle = TRACK_TITLES[selectedTrackId] ?? selectedTrackId;
-
   async function startSession(mode: 'quick' | 'extended') {
     if (mode === 'extended' && !isAuthed) {
-      const next = encodeURIComponent('/select-mode');
-      router.push(`/login?next=${next}`);
+      // Preserve the user's intent so we can auto-start after they finish logging in.
+      const back = encodeURIComponent('/select-mode?autostart=extended');
+      router.push(`/login?next=${back}`);
       return;
     }
 
@@ -63,8 +61,8 @@ export default function SelectModePage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         if (res.status === 401) {
-          const next = encodeURIComponent('/select-mode');
-          router.push(`/login?next=${next}`);
+          const back = encodeURIComponent('/select-mode?autostart=extended');
+          router.push(`/login?next=${back}`);
           return;
         }
         throw new Error(data.error ?? 'حدث خطأ في الاتصال، حاول مجدداً');
@@ -77,6 +75,35 @@ export default function SelectModePage() {
       setLoading(false);
     }
   }
+
+  // After auth check completes, auto-start the session if the user returned
+  // from a "please log in first" detour (we carry that intent in ?autostart=extended).
+  useEffect(() => {
+    if (!authChecked || !isAuthed || autostartedRef.current) return;
+    if (!selectedTrackId || !selectedMajorId) return;
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autostart') !== 'extended') return;
+
+    autostartedRef.current = true;
+    // Clean the URL so refreshes / back-navigation don't re-trigger autostart.
+    params.delete('autostart');
+    const newSearch = params.toString();
+    window.history.replaceState(
+      {},
+      '',
+      '/select-mode' + (newSearch ? `?${newSearch}` : ''),
+    );
+    startSession('extended');
+    // startSession is intentionally omitted from deps — it's redefined every render
+    // and including it would loop; we gate via autostartedRef.current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked, isAuthed, selectedTrackId, selectedMajorId]);
+
+  if (!selectedTrackId || !selectedMajorId) return null;
+
+  const trackTitle = TRACK_TITLES[selectedTrackId] ?? selectedTrackId;
 
   if (loading) {
     return (

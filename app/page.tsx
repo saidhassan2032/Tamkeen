@@ -1,11 +1,13 @@
-'use client';
-
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/Logo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { AuthNav } from '@/components/auth/AuthNav';
 import { ArrowLeft } from 'lucide-react';
+import { getCurrentUser } from '@/lib/auth';
+
+export const dynamic = 'force-dynamic';
 
 const FEATURES = [
   {
@@ -32,7 +34,12 @@ const TRACKS_PREVIEW = [
   { label: 'التصميم', count: '2 مسارات' },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const user = await getCurrentUser();
+  if (user) {
+    redirect('/dashboard');
+  }
+
   return (
     <main className="min-h-screen bg-bg text-text">
       {/* ── Nav ────────────────────────────────────────────────────────── */}
