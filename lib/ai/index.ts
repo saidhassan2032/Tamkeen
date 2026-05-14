@@ -297,7 +297,7 @@ export async function streamAgentReply(
   const result = streamText({
     model: getModel('chat'),
     maxRetries: 2,
-    maxOutputTokens: 1000,
+    maxOutputTokens: 2000,
     output: Output.object({ schema: ChatReplySchema, name: 'chat_reply' }),
     system: makeSystemPrompt(
       agentName,
@@ -346,10 +346,10 @@ export async function streamAgentReply(
       console.error('[streamAgentReply] Raw model text:', err.text);
       console.error('[streamAgentReply] Finish reason:', err.finishReason);
       console.error('[streamAgentReply] Cause:', err.cause);
-    } else {
-      console.error('[streamAgentReply] Stack:', err?.stack);
+      return { text: 'عذراً، حدث خطأ في صياغة الرد. ممكن تعيد صياغة سؤالك؟', taskState: 'started' };
     }
-    throw err;
+    console.error('[streamAgentReply] Stack:', err?.stack);
+    return { text: 'عذراً، حدث خطأ غير متوقع. حاول مرة أخرى.', taskState: 'started' };
   }
 
   return {
