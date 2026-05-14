@@ -82,6 +82,7 @@ export default function SimulationPage() {
   const [completing, setCompleting] = useState(false);
   const [totalTasks, setTotalTasks] = useState(0);
   const [showEndDialog, setShowEndDialog] = useState(false);
+  const [redirectingToReport, setRedirectingToReport] = useState(false);
   const [blockedDialog, setBlockedDialog] = useState<{
     taskStatus: string;
     feedback: string;
@@ -335,6 +336,7 @@ export default function SimulationPage() {
   };
 
   const handleFinishToReport = () => {
+    setRedirectingToReport(true);
     router.push(`/report/${sessionId}`);
   };
 
@@ -356,6 +358,14 @@ export default function SimulationPage() {
             <Button variant="outline">العودة للرئيسية</Button>
           </Link>
         </div>
+      </main>
+    );
+  }
+
+  if (redirectingToReport) {
+    return (
+      <main className="h-screen bg-bg flex items-center justify-center">
+        <LoadingMark size={120} label="جاري إعداد تقرير الأداء..." />
       </main>
     );
   }

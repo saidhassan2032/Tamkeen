@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.resolve(__dirname, '..', 'public');
 
-const FILES = ['logo.png', 'mark.png', 'mark-glow.png'];
+const FILES = ['logo.png', 'mark.png', 'mark-glow.png', 'white_logo.png', 'white_mark.png'];
 
 for (const name of FILES) {
   const src = path.join(PUBLIC, name);

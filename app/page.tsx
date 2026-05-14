@@ -42,9 +42,6 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <AuthNav />
-            <Link href="/select-major">
-              <Button size="sm">ابدأ المحاكاة</Button>
-            </Link>
           </div>
         </div>
       </nav>

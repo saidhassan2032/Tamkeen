@@ -1,6 +1,9 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/theme/ThemeProvider';
 
 interface Props {
   /**
@@ -23,19 +26,26 @@ interface Props {
  *   - the wordmark (/logo.png) — wide aspect, includes the word "تمكين"
  *   - the diamond mark (/mark.png) — square glyph for tight spaces (e.g. footer, favicons)
  *
- * Both assets are theme-agnostic — colours come baked into the PNG.
+ * In dark mode the white variants (/white_logo.png, /white_mark.png) are used instead.
  */
 export function Logo({ withWordmark, asLink, size, className }: Props) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   // Sensible defaults: wordmark is a comfortable header height; mark is a smaller glyph.
   const height = size ?? (withWordmark ? 44 : 32);
   // For the wordmark we pass a generous width upper bound to Next/Image and then
   // override with CSS so the natural aspect ratio is preserved at any height.
   const renderedWidth = withWordmark ? height * 4 : height;
 
+  const src = withWordmark
+    ? isDark ? '/white_logo.png' : '/logo.png'
+    : isDark ? '/white_mark.png' : '/mark.png';
+
   const content = (
     <span className={cn('inline-flex items-center', className)}>
       <Image
-        src={withWordmark ? '/logo.png' : '/mark.png'}
+        src={src}
         alt="تمكين"
         width={renderedWidth}
         height={height}
