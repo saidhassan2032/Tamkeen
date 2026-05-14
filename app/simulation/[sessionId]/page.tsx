@@ -83,6 +83,7 @@ export default function SimulationPage() {
   const [totalTasks, setTotalTasks] = useState(0);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [redirectingToReport, setRedirectingToReport] = useState(false);
+  const [completedByAi, setCompletedByAi] = useState<string | null>(null);
   const [blockedDialog, setBlockedDialog] = useState<{
     taskStatus: string;
     feedback: string;
@@ -93,7 +94,8 @@ export default function SimulationPage() {
   const warned2MinRef = useRef(false);
   const expiredHandledRef = useRef(false);
 
-  const currentTask = tasks.find((t) => t.status === 'started' || t.status === 'largely' || t.status === 'completed');
+  const currentTask = tasks.find((t) => t.status === 'started' || t.status === 'largely')
+    ?? (completedByAi ? tasks.find(t => t.id === completedByAi) : undefined);
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0];
   const isTyping = typingAgentId === activeAgent?.id;
@@ -219,6 +221,7 @@ export default function SimulationPage() {
           setStreamingMessage(accumulated);
         }
         if (data.type === 'task_completed') {
+          setCompletedByAi(data.taskId);
           setTasks((prev) => prev.map((t) =>
             t.id === data.taskId ? { ...t, status: 'completed' } : t
           ));
@@ -263,8 +266,10 @@ export default function SimulationPage() {
         return;
       }
       if (data.done) {
+        setCompletedByAi(null);
         setShowEndDialog(true);
       } else if (data.nextTask) {
+        setCompletedByAi(null);
         setTasks((prev) => {
           const updated = prev.map((t) => {
             if (t.id === currentTask.id) return { ...t, status: 'completed' };
@@ -307,8 +312,10 @@ export default function SimulationPage() {
         throw new Error(data.error ?? 'حدث خطأ');
       }
       if (data.done) {
+        setCompletedByAi(null);
         setShowEndDialog(true);
       } else if (data.nextTask) {
+        setCompletedByAi(null);
         setTasks((prev) => {
           const updated = prev.map((t) => {
             if (t.id === currentTask.id) return { ...t, status: 'completed' };
