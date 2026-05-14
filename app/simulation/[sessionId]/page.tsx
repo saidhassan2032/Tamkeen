@@ -425,7 +425,6 @@ export default function SimulationPage() {
           activeAgentId={activeAgent.id}
           onSelect={handleSelectAgent}
           unread={unread}
-          taskWaitingAgentId={currentTask.waitingAgentId}
         />
 
         <ChatWindow

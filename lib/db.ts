@@ -78,6 +78,7 @@ export const tasks = sqliteTable('tasks', {
   sortOrder:          integer('sort_order'),
   status:             text('status').notNull().default('pending'),
   difficulty:         integer('difficulty').notNull(),
+  workflowType:       text('workflow_type').default('self_contained'),
   waitingAgentId:     text('waiting_agent_id').notNull(),
   assignedByAgentId:  text('assigned_by_agent_id').notNull(),
   startedAt:          integer('started_at'),

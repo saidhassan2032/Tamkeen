@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
       sortOrder: 1,
       status: 'started',
       difficulty: generated.difficulty ?? 1,
+      workflowType: generated.workflowType ?? 'self_contained',
       waitingAgentId: waiting,
       assignedByAgentId: assigner,
       startedAt,

@@ -17,10 +17,9 @@ interface Props {
   activeAgentId: string;
   onSelect: (id: string) => void;
   unread: Record<string, boolean>;
-  taskWaitingAgentId?: string;
 }
 
-export function AgentsSidebar({ agents, activeAgentId, onSelect, unread, taskWaitingAgentId }: Props) {
+export function AgentsSidebar({ agents, activeAgentId, onSelect, unread }: Props) {
   return (
     <aside className="w-[260px] shrink-0 border-l border-border bg-surface flex flex-col">
       <div className="px-5 h-14 flex items-center border-b border-border">
@@ -30,7 +29,6 @@ export function AgentsSidebar({ agents, activeAgentId, onSelect, unread, taskWai
         {agents.map((agent) => {
           const isActive = agent.id === activeAgentId;
           const hasUnread = unread[agent.id];
-          const isWaiting = agent.id === taskWaitingAgentId;
           return (
             <button
               key={agent.id}
@@ -57,12 +55,6 @@ export function AgentsSidebar({ agents, activeAgentId, onSelect, unread, taskWai
                   )}
                 </div>
                 <div className="text-xs text-text-muted truncate">{agent.roleTitle}</div>
-                {isWaiting && (
-                  <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-accent">
-                    <span className="w-1 h-1 rounded-full bg-accent" />
-                    ينتظر منك
-                  </div>
-                )}
               </div>
             </button>
           );

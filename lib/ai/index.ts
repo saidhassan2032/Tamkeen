@@ -11,6 +11,7 @@ export interface GeneratedTask {
   description: string;
   resources: Array<{ name: string; type: string; content: string }>;
   deadlineMinutes: number;
+  workflowType: 'self_contained' | 'delegated' | 'handoff';
   waitingAgentId: string;
   assignedByAgentId: string;
   difficulty: number;
@@ -29,6 +30,7 @@ const TaskSchema = z.object({
   description: z.string().describe('وصف مختصر للمهمة (سطر-سطرين)'),
   deadlineMinutes: z.number().int().min(10).max(180),
   difficulty: z.number().int().min(1).max(5),
+  workflowType: z.enum(['self_contained', 'delegated', 'handoff']),
   waitingAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
   assignedByAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
   resources: z.array(TaskResourceSchema).max(2),
@@ -61,6 +63,11 @@ export function makeTaskPrompt(
   البيئة: ${companyContext}
   المهمة رقم ${index + 1} من ${total} (الصعوبة المقترحة: ${Math.min(5, index + 1)}).
   ${prevTasksText ? `المهام السابقة في نفس الجلسة (لا تكررها):\n${prevTasksText}` : ''}
+
+  اختر workflowType المناسب حسب طبيعة المهمة:
+  • self_contained: المستخدم يشتغل مع الشخص اللي أعطاه المهمة (assignedByAgentId) من البداية للنهاية — الأكثر شيوعاً
+  • delegated: المدير يعطي المهمة ويقول للمستخدم يشتغل مع زميل آخر، والمستخدم يكمل مع الزميل
+  • handoff: المستخدم يشتغل مع المدير، وبعد ما يخلص يسلم الشغل لزميل آخر يراجعه
 
   اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
 }
@@ -187,9 +194,24 @@ function makeSystemPrompt(
   taskDescription: string,
   timeRemainingMinutes: number,
   shouldEvaluate: boolean,
+  agentRole: string,
+  crossContext: string,
 ) {
   const evalInstruction = shouldEvaluate
     ? '\n- قيّم أداء المستخدم في حقل score (quality, speed, communication, verdict)'
+    : '';
+
+  let workflowInstruction = '';
+  if (agentRole === 'collaborator') {
+    workflowInstruction = '\n- المستخدم جاك بناءً على توجيه المسؤول عن المهمة. تعاون معه لإنجاز الشغل.';
+  } else if (agentRole === 'reviewer') {
+    workflowInstruction = '\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.';
+  } else if (agentRole === 'assigner') {
+    workflowInstruction = '\n- أنت المسؤول عن هالمهمة من البداية للنهاية.';
+  }
+
+  const crossContextBlock = crossContext
+    ? `\n\nهذه محادثات المستخدم مع زملاء آخرين عن نفس المهمة (لعلمك فقط — لا ترد نيابة عنهم):\n${crossContext}`
     : '';
 
   return `أنت ${agentName}، ${agentRoleTitle} في ${companyContext}.
@@ -201,7 +223,7 @@ function makeSystemPrompt(
 الوقت المتبقي: ${timeRemainingMinutes} دقيقة
 
 شخصيتك: ${agentPersonality}
-دورك في هذه المهمة: ${agentRoleInTask}
+دورك في هذه المهمة: ${agentRoleInTask}${workflowInstruction}
 
 تعليمات:
 - تحدث بعامية سعودية بسيطة وطبيعية
@@ -214,7 +236,7 @@ function makeSystemPrompt(
 - حدّد مرحلة إنجاز المهمة في حقل taskState:
   • started: المستخدم ما زال في البداية أو العمل قليل
   • largely: أغلب العمل تم لكن يحتاج تحسينات
-  • completed: المهمة منجزة بالكامل — في هذه الحالة أخبر المستخدم أنه خلص المهمة واطلب منه يضغط على زر "إنهاء المهمة" عشان ينتقل للجاية${evalInstruction}`;
+  • completed: المهمة منجزة بالكامل — في هذه الحالة أخبر المستخدم أنه خلص المهمة واطلب منه يضغط على زر "إنهاء المهمة" عشان ينتقل للجاية${evalInstruction}${crossContextBlock}`;
 }
 
 export async function streamAgentReply(
@@ -229,6 +251,8 @@ export async function streamAgentReply(
   timeRemainingMinutes: number,
   conversationHistory: HistoryItem[],
   shouldEvaluate: boolean,
+  agentRole: string,
+  crossContext: string,
   onChunk: (text: string) => void,
 ): Promise<StreamReplyResult> {
   const safeHistory: HistoryItem[] =
@@ -251,6 +275,8 @@ export async function streamAgentReply(
       taskDescription,
       timeRemainingMinutes,
       shouldEvaluate,
+      agentRole,
+      crossContext,
     ),
     messages: buildMessages(safeHistory) as any,
   });

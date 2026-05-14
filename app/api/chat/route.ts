@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { db, messages, tasks, sessions, agents } from '@/lib/db';
+import { db, messages, tasks, sessions, agents, type Agent } from '@/lib/db';
 import { streamAgentReply } from '@/lib/claude';
 import { createSSEStream } from '@/lib/sse';
 import { eq, and, or } from 'drizzle-orm';
@@ -7,6 +7,32 @@ import { randomUUID } from 'crypto';
 
 export const maxDuration = 60;
 export const runtime = 'nodejs';
+
+function determineAgentRole(
+  workflowType: string,
+  currentAgentId: string,
+  assignedByAgentId: string,
+): string {
+  if (workflowType === 'self_contained') return 'assigner';
+  if (currentAgentId === assignedByAgentId) return 'assigner';
+  if (workflowType === 'delegated') return 'collaborator';
+  if (workflowType === 'handoff') return 'reviewer';
+  return 'assigner';
+}
+
+function formatCrossContext(
+  otherAgent: Agent,
+  otherMessages: { role: string; content: string }[],
+): string {
+  if (!otherMessages.length) return '';
+  const lines = [`--- المحادثة مع ${otherAgent.name} (${otherAgent.roleTitle}) ---`];
+  for (const m of otherMessages) {
+    const sender = m.role === 'user' ? 'المستخدم' : otherAgent.name;
+    lines.push(`${sender}: ${m.content}`);
+  }
+  lines.push('--- نهاية المحادثة ---');
+  return lines.join('\n');
+}
 
 export async function POST(req: NextRequest) {
   const { sessionId, agentId, content, attachments } = await req.json();
@@ -31,16 +57,18 @@ export async function POST(req: NextRequest) {
     timestamp: Date.now(),
   });
 
-  const [session, currentTask, agentData, history] = await Promise.all([
+  const [session, currentTask, allAgents, myMessages] = await Promise.all([
     db.select().from(sessions).where(eq(sessions.id, sessionId)).get(),
     db.select().from(tasks).where(and(eq(tasks.sessionId, sessionId), or(eq(tasks.status, 'started'), eq(tasks.status, 'largely'), eq(tasks.status, 'active')))).get(),
-    db.select().from(agents).where(eq(agents.id, agentId)).get(),
+    db.select().from(agents).where(eq(agents.sessionId, sessionId)),
     db
       .select()
       .from(messages)
       .where(and(eq(messages.sessionId, sessionId), eq(messages.agentId, agentId)))
       .orderBy(messages.timestamp),
   ]);
+
+  const agentData = allAgents.find((a) => a.id === agentId);
 
   if (!session || !currentTask || !agentData) {
     return new Response(JSON.stringify({ error: 'الجلسة غير موجودة' }), {
@@ -49,7 +77,24 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const userTurns = history.filter((m) => m.role === 'user').length;
+  const workflowType = currentTask.workflowType ?? 'self_contained';
+  const agentRole = determineAgentRole(workflowType, agentId, currentTask.assignedByAgentId);
+
+  let crossContext = '';
+  if (workflowType !== 'self_contained' && agentId !== currentTask.assignedByAgentId) {
+    const otherMessages = await db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.sessionId, sessionId), eq(messages.agentId, currentTask.assignedByAgentId)))
+      .orderBy(messages.timestamp);
+    const otherAgent = allAgents.find((a) => a.id === currentTask.assignedByAgentId);
+    if (otherAgent && otherMessages.length > 0) {
+      const recent = otherMessages.slice(-6);
+      crossContext = formatCrossContext(otherAgent, recent);
+    }
+  }
+
+  const userTurns = myMessages.filter((m) => m.role === 'user').length;
   const shouldEvaluate = userTurns >= 4;
   const startedAt = currentTask.startedAt ?? Date.now();
   const timeRemaining = Math.max(
@@ -57,7 +102,7 @@ export async function POST(req: NextRequest) {
     Math.floor((startedAt + currentTask.deadlineMinutes * 60000 - Date.now()) / 60000),
   );
 
-  const conversationHistory = history.map((m) => {
+  const conversationHistory = myMessages.map((m) => {
     let parsed: any = undefined;
     if (m.attachments) {
       try {
@@ -86,6 +131,8 @@ export async function POST(req: NextRequest) {
       timeRemaining,
       conversationHistory,
       shouldEvaluate,
+      agentRole,
+      crossContext,
       (chunk) => {
         send({ type: 'chunk', agentId, text: chunk });
       },

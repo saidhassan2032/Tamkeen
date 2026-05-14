@@ -55,6 +55,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
         sortOrder: i + 1,
         status: 'pending',
         difficulty: generated.difficulty ?? i + 1,
+        workflowType: generated.workflowType ?? 'self_contained',
         waitingAgentId: waiting,
         assignedByAgentId: assigner,
       });
