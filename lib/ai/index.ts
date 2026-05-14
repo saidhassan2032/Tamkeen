@@ -230,7 +230,8 @@ function makeSystemPrompt(
   } else if (agentRole === 'reviewer') {
     workflowInstruction = `\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.`;
   } else if (agentRole === 'assigner' && otherAgentName) {
-    workflowInstruction = `\n- المستخدم راح يشتغل معاك وبعدها حيسلم الشغل لـ ${otherAgentName} يراجعه. في النهاية قله يروح لـ ${otherAgentName}.`;
+    workflowInstruction = `\n- المستخدم راح يشتغل معاك وبعدها حيسلم الشغل لـ ${otherAgentName} يراجعه. في النهاية قله يروح لـ ${otherAgentName}.
+- مهم: لا تحط taskState=completed لمجرد إنك خلصت دورك. إذا المستخدم خلص معاك حط largely. المهمة تنتهي بالكامل لما ${otherAgentName} يوافق عليها.`;
   } else if (agentRole === 'assigner') {
     workflowInstruction = '\n- أنت المسؤول عن هالمهمة من البداية للنهاية.';
   }
