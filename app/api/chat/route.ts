@@ -115,11 +115,17 @@ export async function POST(req: NextRequest) {
 
     if (result.taskState && currentTask.status !== 'completed') {
       const update: Record<string, any> = { status: result.taskState };
-      if (result.taskState === 'completed') update.completedAt = Date.now();
+      if (result.taskState === 'completed') {
+        update.completedAt = Date.now();
+      }
       await db
         .update(tasks)
         .set(update)
         .where(eq(tasks.id, currentTask.id));
+
+      if (result.taskState === 'completed') {
+        send({ type: 'task_completed', taskId: currentTask.id });
+      }
     }
 
     send({ type: 'done', agentId });

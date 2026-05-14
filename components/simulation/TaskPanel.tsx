@@ -61,9 +61,18 @@ export function TaskPanel({ task, timeRemaining, totalTasks, completedTasks, onC
         <Progress value={progress} className={barTone} />
       </div>
 
-      <Button onClick={onComplete} disabled={isCompleting} className="w-full" size="sm">
+      <Button
+        onClick={onComplete}
+        disabled={isCompleting}
+        className={`w-full ${task.status === 'completed' ? 'animate-pulse ring-2 ring-green-500 shadow-lg shadow-green-500/30' : ''}`}
+        size="sm"
+      >
         <CheckCircle2 className="w-4 h-4 ml-2" />
-        {isCompleting ? 'جاري الإنهاء...' : 'إنهاء المهمة'}
+        {isCompleting
+          ? 'جاري الإنهاء...'
+          : task.status === 'completed'
+            ? 'تم الإنجاز — اضغط للمتابعة'
+            : 'إنهاء المهمة'}
       </Button>
     </div>
   );

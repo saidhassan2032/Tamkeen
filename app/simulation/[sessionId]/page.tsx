@@ -93,7 +93,7 @@ export default function SimulationPage() {
   const warned2MinRef = useRef(false);
   const expiredHandledRef = useRef(false);
 
-  const currentTask = tasks.find((t) => t.status === 'started' || t.status === 'largely');
+  const currentTask = tasks.find((t) => t.status === 'started' || t.status === 'largely' || t.status === 'completed');
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0];
   const isTyping = typingAgentId === activeAgent?.id;
@@ -217,6 +217,11 @@ export default function SimulationPage() {
         if (data.type === 'chunk') {
           accumulated += data.text;
           setStreamingMessage(accumulated);
+        }
+        if (data.type === 'task_completed') {
+          setTasks((prev) => prev.map((t) =>
+            t.id === data.taskId ? { ...t, status: 'completed' } : t
+          ));
         }
         if (data.type === 'done') {
           setConversations((prev) => ({
