@@ -219,6 +219,7 @@ function makeSystemPrompt(
   agentRole: string,
   crossContext: string,
   otherAgentName: string,
+  workflowType: string,
 ) {
   const evalInstruction = shouldEvaluate
     ? '\n- قيّم أداء المستخدم في حقل score (quality, speed, communication, verdict)'
@@ -226,12 +227,17 @@ function makeSystemPrompt(
 
   let workflowInstruction = '';
   if (agentRole === 'collaborator') {
-    workflowInstruction = '\n- المستخدم جاك بناءً على توجيه المسؤول عن المهمة. تعاون معه لإنجاز الشغل.';
+    workflowInstruction = `\n- المستخدم جاك بناءً على توجيه المسؤول عن المهمة. تعاون معه لإنجاز الشغل.
+- أنت المسؤول عن تقييم المهمة — قيم وحدد إذا انتهت.`;
   } else if (agentRole === 'reviewer') {
-    workflowInstruction = `\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.`;
-  } else if (agentRole === 'assigner' && otherAgentName) {
+    workflowInstruction = `\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.
+- لا تحط completed إلا بعد ما تراجع الشغل كامل وتتأكد إنه تمام.`;
+  } else if (agentRole === 'assigner' && otherAgentName && workflowType === 'handoff') {
     workflowInstruction = `\n- المستخدم راح يشتغل معاك وبعدها حيسلم الشغل لـ ${otherAgentName} يراجعه. في النهاية قله يروح لـ ${otherAgentName}.
 - مهم: لا تحط taskState=completed لمجرد إنك خلصت دورك. إذا المستخدم خلص معاك حط largely. المهمة تنتهي بالكامل لما ${otherAgentName} يوافق عليها.`;
+  } else if (agentRole === 'assigner' && otherAgentName && workflowType === 'delegated') {
+    workflowInstruction = `\n- المستخدم راح يشتغل معاك بالبداية. دورك إنك تعطيه المهمة وتوجهه لـ ${otherAgentName}.
+- لا تحط taskState أبداً — ${otherAgentName} هو اللي يقيم لما المستخدم يخلص معاه.`;
   } else if (agentRole === 'assigner') {
     workflowInstruction = '\n- أنت المسؤول عن هالمهمة من البداية للنهاية.';
   }
@@ -280,6 +286,7 @@ export async function streamAgentReply(
   agentRole: string,
   crossContext: string,
   otherAgentName: string,
+  workflowType: string,
   onChunk: (text: string) => void,
 ): Promise<StreamReplyResult> {
   const safeHistory: HistoryItem[] =
@@ -306,6 +313,7 @@ export async function streamAgentReply(
       agentRole,
       crossContext,
       otherAgentName,
+      workflowType,
     ),
     messages: buildMessages(safeHistory) as any,
   });

@@ -140,6 +140,7 @@ export async function POST(req: NextRequest) {
       agentRole,
       crossContext,
       otherAgentName,
+      workflowType,
       (chunk) => {
         send({ type: 'chunk', agentId, text: chunk });
       },
