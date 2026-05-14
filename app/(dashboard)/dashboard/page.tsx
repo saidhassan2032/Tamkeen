@@ -67,7 +67,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <DashboardTopbar title="تقرير أداء الفريق" subtitle={isPlaceholder ? 'لا توجد جلسات بعد — هذه أرقام توضيحية' : undefined} />
+      <DashboardTopbar title="" />
 
       <main className="flex-1 px-6 lg:px-10 py-8 max-w-6xl w-full">
         {/* Greeting */}
