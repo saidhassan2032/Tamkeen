@@ -288,7 +288,8 @@ export async function streamAgentReply(
 
   const result = streamText({
     model: getModel('chat'),
-    maxOutputTokens: 600,
+    maxRetries: 2,
+    maxOutputTokens: 1000,
     output: Output.object({ schema: ChatReplySchema, name: 'chat_reply' }),
     system: makeSystemPrompt(
       agentName,
