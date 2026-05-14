@@ -21,14 +21,19 @@ jest.mock('ai', () => ({
 describe('Sequential Task Generation', () => {
   const mockTrackId = 'test-track';
   const mockCompanyContext = 'Test Company';
-  
+  const mockAgents = [
+    { id: 'manager', name: 'أحمد', roleTitle: 'مدير' },
+    { id: 'colleague_1', name: 'سارة', roleTitle: 'مطورة' },
+    { id: 'colleague_2', name: 'فيصل', roleTitle: 'مختبر' },
+  ];
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   describe('makeTaskPrompt', () => {
     test('should create prompt with no previous tasks', () => {
-      const prompt = makeTaskPrompt(mockTrackId, mockCompanyContext, 0, 3, []);
+      const prompt = makeTaskPrompt(mockTrackId, mockCompanyContext, 0, 3, [], mockAgents);
       expect(prompt).toContain(`المسار: ${mockTrackId}`);
       expect(prompt).toContain(`البيئة: ${mockCompanyContext}`);
       expect(prompt).toContain('المهمة رقم 1 من 3');
@@ -40,8 +45,8 @@ describe('Sequential Task Generation', () => {
         { title: 'المهمة الأولى', description: 'وصف المهمة الأولى' },
         { title: 'المهمة الثانية', description: 'وصف المهمة الثانية' },
       ];
-      
-      const prompt = makeTaskPrompt(mockTrackId, mockCompanyContext, 1, 3, prevTasks);
+
+      const prompt = makeTaskPrompt(mockTrackId, mockCompanyContext, 1, 3, prevTasks, mockAgents);
       expect(prompt).toContain('المهام السابقة في نفس الجلسة');
       expect(prompt).toContain('المهمة السابقة 1:');
       expect(prompt).toContain('- العنوان: المهمة الأولى');
@@ -55,9 +60,9 @@ describe('Sequential Task Generation', () => {
   describe('generateTasks', () => {
     test('should generate tasks sequentially with context propagation', async () => {
       const mockTasks = [
-        { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
-        { title: 'المهمة 2', description: 'الوصف 2', resources: [], deadlineMinutes: 45, waitingAgentId: 'colleague_1', assignedByAgentId: 'colleague_1', difficulty: 2, guidanceTips: [], starterMessage: 'رسالة البداية 2' },
-        { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
+        { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, workflowType: 'self_contained', waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
+        { title: 'المهمة 2', description: 'الوصف 2', resources: [], deadlineMinutes: 45, workflowType: 'delegated', waitingAgentId: 'colleague_1', assignedByAgentId: 'manager', difficulty: 2, guidanceTips: [], starterMessage: 'رسالة البداية 2' },
+        { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, workflowType: 'handoff', waitingAgentId: 'colleague_2', assignedByAgentId: 'manager', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
       ];
 
       // Mock generateText to return different tasks based on call count
@@ -69,8 +74,7 @@ describe('Sequential Task Generation', () => {
         output: mockTasks[2],
       }));
 
-      const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick');
-
+      const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick', mockAgents);
       // Verify sequential calls with increasing context
       expect(generateText).toHaveBeenCalledTimes(3);
       
@@ -106,14 +110,14 @@ describe('Sequential Task Generation', () => {
     test('should handle partial failures and return successful tasks', async () => {
       // Mock generateText to fail on second call, succeed on others
       (generateText as jest.Mock).mockImplementationOnce(() => ({
-        output: { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
+        output: { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, workflowType: 'self_contained', waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
       })).mockImplementationOnce(() => {
         throw new Error('AI service error');
       }).mockImplementationOnce(() => ({
-        output: { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
+        output: { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, workflowType: 'delegated', waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
       }));
 
-      const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick');
+      const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick', mockAgents);
       
       // Should return 2 successful tasks despite middle failure
       expect(result).toHaveLength(2);
@@ -136,7 +140,7 @@ describe('Sequential Task Generation', () => {
         throw new Error('AI service error');
       });
 
-      await expect(generateTasks(mockTrackId, mockCompanyContext, 'quick'))
+      await expect(generateTasks(mockTrackId, mockCompanyContext, 'quick', mockAgents))
         .rejects
         .toThrow('لم يُرجع أي مهام، حاول مجدداً');
     });

@@ -20,4 +20,5 @@ export type {
   ReportData,
   ChatScore,
   StreamReplyResult,
+  AgentInfo,
 } from './ai';

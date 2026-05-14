@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { createSSEStream } from '@/lib/sse';
 import { db, sessions, tasks } from '@/lib/db';
 import { generateOneTask } from '@/lib/claude';
+import type { AgentInfo } from '@/lib/claude';
+import { AGENT_TEMPLATES } from '@/types';
 import { eq, asc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -11,6 +13,15 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   return createSSEStream(async (send) => {
     const session = await db.select().from(sessions).where(eq(sessions.id, params.id)).get();
     if (!session) return;
+
+    const template = AGENT_TEMPLATES[session.trackId];
+    if (!template) return;
+
+    const agentNames: AgentInfo[] = [
+      { id: 'manager',      name: template.manager.name,      roleTitle: template.manager.roleTitle },
+      { id: 'colleague_1',  name: template.colleague1.name,   roleTitle: template.colleague1.roleTitle },
+      { id: 'colleague_2',  name: template.colleague2.name,   roleTitle: template.colleague2.roleTitle },
+    ];
 
     const totalCount = session.totalTasks;
 
@@ -31,6 +42,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
         i,
         totalCount,
         prevTasks,
+        agentNames,
       );
 
       if (!generated) continue;

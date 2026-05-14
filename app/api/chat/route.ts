@@ -94,6 +94,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  let otherAgentName = '';
+  if (workflowType !== 'self_contained' && agentId === currentTask.assignedByAgentId) {
+    const other = allAgents.find((a) => a.id === currentTask.waitingAgentId);
+    if (other) otherAgentName = `${other.name} (${other.roleTitle})`;
+  }
+
   const userTurns = myMessages.filter((m) => m.role === 'user').length;
   const shouldEvaluate = userTurns >= 4;
   const startedAt = currentTask.startedAt ?? Date.now();
@@ -133,6 +139,7 @@ export async function POST(req: NextRequest) {
       shouldEvaluate,
       agentRole,
       crossContext,
+      otherAgentName,
       (chunk) => {
         send({ type: 'chunk', agentId, text: chunk });
       },

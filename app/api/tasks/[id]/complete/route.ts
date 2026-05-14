@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, tasks, messages, sessions } from '@/lib/db';
-import { eq, and, asc, desc, count } from 'drizzle-orm';
 import { generateOneTask } from '@/lib/claude';
+import type { AgentInfo } from '@/lib/claude';
+import { AGENT_TEMPLATES } from '@/types';
+import { eq, and, asc, desc, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export const runtime = 'nodejs';
@@ -154,12 +156,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         const prevTasks = existingTasks.map(t => ({ title: t.title, description: t.description }));
         const nextIndex = existingTasks.length;
 
+        const templateName = session.trackId;
+        const template = AGENT_TEMPLATES[templateName];
+        const agentNames: AgentInfo[] = template
+          ? [
+              { id: 'manager',      name: template.manager.name,      roleTitle: template.manager.roleTitle },
+              { id: 'colleague_1',  name: template.colleague1.name,   roleTitle: template.colleague1.roleTitle },
+              { id: 'colleague_2',  name: template.colleague2.name,   roleTitle: template.colleague2.roleTitle },
+            ]
+          : [];
+
         const generated = await generateOneTask(
           session.trackId,
           session.companyContext,
           nextIndex,
           session.totalTasks,
           prevTasks,
+          agentNames,
         );
 
         if (generated) {

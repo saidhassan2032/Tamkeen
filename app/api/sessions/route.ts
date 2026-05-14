@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, sessions, agents, tasks, messages } from '@/lib/db';
 import { generateOneTask } from '@/lib/claude';
+import type { AgentInfo } from '@/lib/claude';
 import { AGENT_TEMPLATES } from '@/types';
 import { randomUUID } from 'crypto';
 import { getCurrentUser } from '@/lib/auth';
@@ -53,8 +54,14 @@ export async function POST(req: NextRequest) {
       await db.insert(agents).values(agent);
     }
 
+    const agentNames: AgentInfo[] = [
+      { id: 'manager',      name: template.manager.name,      roleTitle: template.manager.roleTitle },
+      { id: 'colleague_1',  name: template.colleague1.name,   roleTitle: template.colleague1.roleTitle },
+      { id: 'colleague_2',  name: template.colleague2.name,   roleTitle: template.colleague2.roleTitle },
+    ];
+
     const generated = await generateOneTask(
-      trackId, template.company, 0, totalTasks, [],
+      trackId, template.company, 0, totalTasks, [], agentNames,
     );
     if (!generated) {
       return NextResponse.json({ error: 'تعذّر توليد المهمة الأولى، حاول مجدداً' }, { status: 500 });

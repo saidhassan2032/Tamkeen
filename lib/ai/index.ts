@@ -4,6 +4,12 @@ import { getModel } from './models';
 import { z } from 'zod/v4';
 import type { Attachment } from '@/types';
 
+export interface AgentInfo {
+  id: string;
+  name: string;
+  roleTitle: string;
+}
+
 // ── Task generation ───────────────────────────────────────────────────────
 
 export interface GeneratedTask {
@@ -46,6 +52,7 @@ export function makeTaskPrompt(
   index: number,
   total: number,
   prevTasks: { title: string; description: string }[],
+  agents: AgentInfo[],
 ) {
   const prevTasksText =
     prevTasks.length > 0
@@ -57,6 +64,13 @@ export function makeTaskPrompt(
           .join('\n\n')
       : '';
 
+  const agentsText = agents
+    .map((a) => {
+      const label = a.id === 'manager' ? 'المدير' : a.id === 'colleague_1' ? 'الزميل الأول' : 'الزميل الثاني';
+      return `  • ${label}: ${a.name} (${a.roleTitle})`;
+    })
+    .join('\n');
+
   return `مصمم محتوى تدريبي لمنصة سعودية.
 
   المسار: ${trackId}
@@ -64,10 +78,16 @@ export function makeTaskPrompt(
   المهمة رقم ${index + 1} من ${total} (الصعوبة المقترحة: ${Math.min(5, index + 1)}).
   ${prevTasksText ? `المهام السابقة في نفس الجلسة (لا تكررها):\n${prevTasksText}` : ''}
 
+  أعضاء الفريق (استخدم أسماءهم الحقيقية):
+${agentsText}
+
   اختر workflowType المناسب حسب طبيعة المهمة:
   • self_contained: المستخدم يشتغل مع الشخص اللي أعطاه المهمة (assignedByAgentId) من البداية للنهاية — الأكثر شيوعاً
   • delegated: المدير يعطي المهمة ويقول للمستخدم يشتغل مع زميل آخر، والمستخدم يكمل مع الزميل
   • handoff: المستخدم يشتغل مع المدير، وبعد ما يخلص يسلم الشغل لزميل آخر يراجعه
+
+  مهم: إذا اخترت delegated أو handoff، استخدم الأسماء الحقيقية من أعضاء الفريق أعلاه.
+  مثلاً في starterMessage: "روح لسارة العتيبي تكمل معاك الشغل" بدلاً من "روح للزميل".
 
   اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
 }
@@ -78,13 +98,14 @@ export async function generateOneTask(
   index: number,
   total: number,
   prevTasks: { title: string; description: string }[],
+  agents: AgentInfo[],
 ): Promise<GeneratedTask | null> {
   try {
     const result = await generateText({
       model: getModel('tasks'),
       maxOutputTokens: 2000,
       output: Output.object({ schema: TaskSchema, name: 'task' }),
-      prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTasks),
+      prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTasks, agents),
     });
     return result.output as GeneratedTask;
   } catch (err) {
@@ -102,6 +123,7 @@ export async function generateTasks(
   trackId: string,
   companyContext: string,
   mode: string,
+  agents: AgentInfo[],
   duration?: string | null,
 ): Promise<GeneratedTask[]> {
   const count = mode === 'quick' ? 3 : duration === '1week' ? 5 : 8;
@@ -110,7 +132,7 @@ export async function generateTasks(
   const prevTasks: { title: string; description: string }[] = [];
 
   for (let i = 0; i < count; i++) {
-    const task = await generateOneTask(trackId, companyContext, i, count, prevTasks);
+    const task = await generateOneTask(trackId, companyContext, i, count, prevTasks, agents);
     if (task) {
       tasks.push(task);
       prevTasks.push({ title: task.title, description: task.description });
@@ -196,6 +218,7 @@ function makeSystemPrompt(
   shouldEvaluate: boolean,
   agentRole: string,
   crossContext: string,
+  otherAgentName: string,
 ) {
   const evalInstruction = shouldEvaluate
     ? '\n- قيّم أداء المستخدم في حقل score (quality, speed, communication, verdict)'
@@ -205,7 +228,9 @@ function makeSystemPrompt(
   if (agentRole === 'collaborator') {
     workflowInstruction = '\n- المستخدم جاك بناءً على توجيه المسؤول عن المهمة. تعاون معه لإنجاز الشغل.';
   } else if (agentRole === 'reviewer') {
-    workflowInstruction = '\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.';
+    workflowInstruction = `\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.`;
+  } else if (agentRole === 'assigner' && otherAgentName) {
+    workflowInstruction = `\n- المستخدم راح يشتغل معاك وبعدها حيسلم الشغل لـ ${otherAgentName} يراجعه. في النهاية قله يروح لـ ${otherAgentName}.`;
   } else if (agentRole === 'assigner') {
     workflowInstruction = '\n- أنت المسؤول عن هالمهمة من البداية للنهاية.';
   }
@@ -253,6 +278,7 @@ export async function streamAgentReply(
   shouldEvaluate: boolean,
   agentRole: string,
   crossContext: string,
+  otherAgentName: string,
   onChunk: (text: string) => void,
 ): Promise<StreamReplyResult> {
   const safeHistory: HistoryItem[] =
@@ -277,6 +303,7 @@ export async function streamAgentReply(
       shouldEvaluate,
       agentRole,
       crossContext,
+      otherAgentName,
     ),
     messages: buildMessages(safeHistory) as any,
   });
