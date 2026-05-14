@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     };
   });
 
-  return createSSEStream(async (send, close) => {
+  return createSSEStream(async (send) => {
     send({ type: 'typing', agentId });
 
     const result = await streamAgentReply(
@@ -123,6 +123,5 @@ export async function POST(req: NextRequest) {
     }
 
     send({ type: 'done', agentId });
-    close();
   });
 }

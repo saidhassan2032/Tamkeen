@@ -1,5 +1,5 @@
 export function createSSEStream(
-  handler: (send: (data: object) => void, close: () => void) => Promise<void>,
+  handler: (send: (data: object) => void) => Promise<void>,
 ): Response {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -12,14 +12,15 @@ export function createSSEStream(
       const close = () => {
         if (closed) return;
         closed = true;
-        controller.close();
+        try { controller.close(); } catch {}
       };
       try {
-        await handler(send, close);
+        await handler(send);
       } catch (err: any) {
         console.error('[createSSEStream] Unhandled error:', err?.message ?? err);
         console.error('[createSSEStream] Stack:', err?.stack);
         send({ type: 'error', message: 'حدث خطأ في الاتصال، حاول مجدداً' });
+      } finally {
         close();
       }
     },

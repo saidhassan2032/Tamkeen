@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, tasks, messages } from '@/lib/db';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { db, tasks, messages, sessions } from '@/lib/db';
+import { eq, and, asc, desc, count } from 'drizzle-orm';
+import { generateOneTask } from '@/lib/claude';
 import { randomUUID } from 'crypto';
 
 export const runtime = 'nodejs';
@@ -30,16 +31,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       done: false,
     };
 
+    let sessionId: string | null = null;
+
     await db.transaction(async (tx) => {
       const completedTask = await tx.select().from(tasks).where(eq(tasks.id, params.id)).get();
       if (!completedTask) {
         throw new Error('مهمة غير موجودة');
       }
 
+      sessionId = completedTask.sessionId;
       const status = completedTask.status;
       const activeStates = ['started', 'active'];
 
-      // Already completed — set completedAt if missing, then activate next task
       if (status === 'completed') {
         if (!completedTask.completedAt) {
           await tx
@@ -56,12 +59,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           canSkip: false,
           skipWarning: null,
           nextTask: nextTask?.task ?? null,
-          done: !nextTask,
+          done: false,
         };
         return;
       }
 
-      // Not completed and not force — block
       if (!force) {
         if (activeStates.includes(status)) {
           result = {
@@ -103,7 +105,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         throw new Error('المهمة غير جاهزة للإنجاز');
       }
 
-      // Force complete — mark with low scores
       const verdict = status === 'largely'
         ? 'تم تخطي المهمة — كانت شبه منجزة'
         : 'تم تخطي المهمة — لم تنجز بالكامل';
@@ -129,9 +130,100 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         canSkip: false,
         skipWarning: null,
         nextTask: nextTask?.task ?? null,
-        done: !nextTask,
+        done: false,
       };
     });
+
+    if (result.taskStatus === 'completed' && result.transitioned && !result.nextTask && sessionId) {
+      const session = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+      if (!session) return NextResponse.json(result);
+
+      const completedResult = await db
+        .select({ value: count() })
+        .from(tasks)
+        .where(and(eq(tasks.sessionId, sessionId), eq(tasks.status, 'completed')))
+        .get();
+      const completedCount = completedResult?.value ?? 0;
+
+      if (completedCount < session.totalTasks) {
+        const existingTasks = await db.select()
+          .from(tasks)
+          .where(eq(tasks.sessionId, sessionId))
+          .orderBy(asc(tasks.sortOrder));
+
+        const prevTasks = existingTasks.map(t => ({ title: t.title, description: t.description }));
+        const nextIndex = existingTasks.length;
+
+        const generated = await generateOneTask(
+          session.trackId,
+          session.companyContext,
+          nextIndex,
+          session.totalTasks,
+          prevTasks,
+        );
+
+        if (generated) {
+          const taskId = randomUUID();
+          const startedAt = Date.now();
+          const waiting = generated.waitingAgentId.startsWith(sessionId)
+            ? generated.waitingAgentId
+            : `${sessionId}_${generated.waitingAgentId}`;
+          const assigner = generated.assignedByAgentId.startsWith(sessionId)
+            ? generated.assignedByAgentId
+            : `${sessionId}_${generated.assignedByAgentId}`;
+
+          await db.insert(tasks).values({
+            id: taskId,
+            sessionId,
+            title: generated.title,
+            description: generated.description,
+            resources: JSON.stringify(generated.resources ?? []),
+            guidanceTips: JSON.stringify(generated.guidanceTips ?? []),
+            starterMessage: generated.starterMessage ?? null,
+            deadlineMinutes: generated.deadlineMinutes ?? 15,
+            sortOrder: nextIndex + 1,
+            status: 'started',
+            difficulty: generated.difficulty ?? nextIndex + 1,
+            waitingAgentId: waiting,
+            assignedByAgentId: assigner,
+            startedAt,
+          });
+
+          if (generated.starterMessage && assigner) {
+            await db.insert(messages).values({
+              id: randomUUID(),
+              sessionId,
+              agentId: assigner,
+              role: 'assistant',
+              content: generated.starterMessage,
+              timestamp: startedAt,
+            });
+          }
+
+          result.nextTask = {
+            id: taskId,
+            sessionId,
+            title: generated.title,
+            description: generated.description,
+            resources: JSON.stringify(generated.resources ?? []),
+            guidanceTips: JSON.stringify(generated.guidanceTips ?? []),
+            starterMessage: generated.starterMessage ?? null,
+            deadlineMinutes: generated.deadlineMinutes ?? 15,
+            sortOrder: nextIndex + 1,
+            status: 'started',
+            difficulty: generated.difficulty ?? nextIndex + 1,
+            waitingAgentId: waiting,
+            assignedByAgentId: assigner,
+            startedAt,
+          };
+          result.done = false;
+        } else {
+          result.done = true;
+        }
+      } else {
+        result.done = true;
+      }
+    }
 
     return NextResponse.json(result);
   } catch (err: any) {

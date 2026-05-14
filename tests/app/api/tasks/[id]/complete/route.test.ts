@@ -2,22 +2,28 @@ import { POST } from '@/app/api/tasks/[id]/complete/route';
 import { db, tasks, messages } from '@/lib/db';
 import { NextRequest } from 'next/server';
 
+function chainable() {
+  return {
+    select: jest.fn().mockReturnThis(),
+    from: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    get: jest.fn(),
+    update: jest.fn().mockReturnThis(),
+    set: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    values: jest.fn().mockReturnThis(),
+  };
+}
+
 jest.mock('@/lib/db', () => ({
   db: {
-    transaction: jest.fn((callback) => callback({
-      select: jest.fn().mockReturnThis(),
-      from: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      get: jest.fn(),
-      update: jest.fn().mockReturnThis(),
-      set: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockReturnThis(),
-      values: jest.fn().mockReturnThis(),
-    })),
+    ...chainable(),
+    transaction: jest.fn(),
   },
   tasks: {},
   messages: {},
+  sessions: {},
 }));
 
 jest.mock('crypto', () => ({
@@ -113,6 +119,10 @@ describe('Task Completion Endpoint', () => {
         };
         return callback(mockTx);
       });
+
+      (db as any).get
+        .mockImplementationOnce(() => ({ id: mockSessionId, totalTasks: 1 }))
+        .mockImplementationOnce(() => ({ value: 1 }));
 
       const response = await POST(makeRequest(), { params: mockParams });
       expect(response.status).toBe(200);

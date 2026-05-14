@@ -8,6 +8,7 @@
 
 export {
   generateTasks,
+  generateOneTask,
   streamAgentReply,
   getGuidance,
   generateReport,

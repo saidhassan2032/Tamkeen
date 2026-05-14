@@ -28,6 +28,7 @@ export const sessions = sqliteTable('sessions', {
   majorId:        text('major_id').notNull(),
   mode:           text('mode').notNull(),
   duration:       text('duration'),
+  totalTasks:     integer('total_tasks').notNull(),
   status:         text('status').notNull().default('active'),
   companyContext: text('company_context').notNull(),
   startedAt:      integer('started_at').notNull(),

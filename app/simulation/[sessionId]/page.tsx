@@ -80,6 +80,7 @@ export default function SimulationPage() {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [notification, setNotification] = useState<Notification | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [totalTasks, setTotalTasks] = useState(0);
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [blockedDialog, setBlockedDialog] = useState<{
     taskStatus: string;
@@ -106,6 +107,7 @@ export default function SimulationPage() {
       const data = await res.json();
       setAgents(data.agents);
       setTasks(data.tasks);
+      setTotalTasks(data.session?.totalTasks ?? data.tasks.length);
       const parsedConversations: Record<string, Message[]> = {};
       for (const [agentId, msgs] of Object.entries(data.conversations as Record<string, any[]>)) {
         parsedConversations[agentId] = msgs.map((m) => {
@@ -141,6 +143,23 @@ export default function SimulationPage() {
     if (!sessionId) return;
     loadSession();
   }, [sessionId, loadSession]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/stream`, { signal: controller.signal });
+        if (!res.body) return;
+        const reader = res.body.getReader();
+        while (!controller.signal.aborted) {
+          const { done } = await reader.read();
+          if (done) break;
+        }
+      } catch {}
+    })();
+    return () => controller.abort();
+  }, [sessionId]);
 
   useEffect(() => {
     if (!currentTask?.startedAt) return;
@@ -240,11 +259,17 @@ export default function SimulationPage() {
       if (data.done) {
         setShowEndDialog(true);
       } else if (data.nextTask) {
-        setTasks((prev) =>
-          prev
-            .map((t) => (t.id === currentTask.id ? { ...t, status: 'completed' } : t))
-            .concat(data.nextTask),
-        );
+        setTasks((prev) => {
+          const updated = prev.map((t) => {
+            if (t.id === currentTask.id) return { ...t, status: 'completed' };
+            if (t.id === data.nextTask.id) return data.nextTask;
+            return t;
+          });
+          if (!prev.some(t => t.id === data.nextTask.id)) {
+            updated.push(data.nextTask);
+          }
+          return updated;
+        });
         if (data.nextTask.starterMessage && data.nextTask.assignedByAgentId) {
           setConversations((prev) => ({
             ...prev,
@@ -278,11 +303,17 @@ export default function SimulationPage() {
       if (data.done) {
         setShowEndDialog(true);
       } else if (data.nextTask) {
-        setTasks((prev) =>
-          prev
-            .map((t) => (t.id === currentTask.id ? { ...t, status: 'completed' } : t))
-            .concat(data.nextTask),
-        );
+        setTasks((prev) => {
+          const updated = prev.map((t) => {
+            if (t.id === currentTask.id) return { ...t, status: 'completed' };
+            if (t.id === data.nextTask.id) return data.nextTask;
+            return t;
+          });
+          if (!prev.some(t => t.id === data.nextTask.id)) {
+            updated.push(data.nextTask);
+          }
+          return updated;
+        });
         if (data.nextTask.starterMessage && data.nextTask.assignedByAgentId) {
           setConversations((prev) => ({
             ...prev,
@@ -394,7 +425,7 @@ export default function SimulationPage() {
           <TaskPanel
             task={currentTask}
             timeRemaining={timeRemaining}
-            totalTasks={tasks.length}
+            totalTasks={totalTasks}
             completedTasks={completedCount}
             onComplete={handleComplete}
             isCompleting={completing}

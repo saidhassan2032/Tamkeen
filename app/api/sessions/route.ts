@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, sessions, agents, tasks, messages } from '@/lib/db';
-import { generateTasks } from '@/lib/claude';
+import { generateOneTask } from '@/lib/claude';
 import { AGENT_TEMPLATES } from '@/types';
 import { randomUUID } from 'crypto';
 
@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
-    const { trackId, majorId, mode, duration } = await req.json();
+    const { trackId, majorId, mode } = await req.json();
 
     if (!trackId || !majorId || !mode) {
       return NextResponse.json({ error: 'بيانات ناقصة' }, { status: 400 });
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'مسار غير موجود' }, { status: 400 });
     }
 
+    const totalTasks = mode === 'quick' ? 3 : 5;
     const sessionId = randomUUID();
 
     await db.insert(sessions).values({
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest) {
       trackId,
       majorId,
       mode,
-      duration: duration ?? null,
+      totalTasks,
       status: 'active',
       companyContext: template.company,
       startedAt: Date.now(),
@@ -42,58 +43,52 @@ export async function POST(req: NextRequest) {
       await db.insert(agents).values(agent);
     }
 
-    const generatedTasks = await generateTasks(trackId, template.company, mode, duration);
-    if (!generatedTasks.length) {
-      return NextResponse.json({ error: 'تعذّر توليد المهام، حاول مجدداً' }, { status: 500 });
+    const generated = await generateOneTask(
+      trackId, template.company, 0, totalTasks, [],
+    );
+    if (!generated) {
+      return NextResponse.json({ error: 'تعذّر توليد المهمة الأولى، حاول مجدداً' }, { status: 500 });
     }
 
-    let firstTaskId: string | null = null;
-    let firstAssigner: string | null = null;
-    let firstStarter: string | null = null;
+    const waiting = generated.waitingAgentId.startsWith(`${sessionId}_`)
+      ? generated.waitingAgentId
+      : `${sessionId}_${generated.waitingAgentId}`;
+    const assigner = generated.assignedByAgentId.startsWith(`${sessionId}_`)
+      ? generated.assignedByAgentId
+      : `${sessionId}_${generated.assignedByAgentId}`;
 
-    for (let i = 0; i < generatedTasks.length; i++) {
-      const task = generatedTasks[i];
-      const waiting = task.waitingAgentId?.startsWith(`${sessionId}_`) ? task.waitingAgentId : `${sessionId}_${task.waitingAgentId}`;
-      const assigner = task.assignedByAgentId?.startsWith(`${sessionId}_`) ? task.assignedByAgentId : `${sessionId}_${task.assignedByAgentId}`;
-      const taskId = randomUUID();
+    const taskId = randomUUID();
+    const startedAt = Date.now();
 
-      await db.insert(tasks).values({
-        id: taskId,
-        sessionId,
-        title: task.title,
-        description: task.description,
-        resources: JSON.stringify(task.resources ?? []),
-        guidanceTips: JSON.stringify(task.guidanceTips ?? []),
-        starterMessage: task.starterMessage ?? null,
-        deadlineMinutes: task.deadlineMinutes ?? 15,
-        sortOrder: i + 1,
-        status: i === 0 ? 'started' : 'pending',
-        difficulty: task.difficulty ?? i + 1,
-        waitingAgentId: waiting,
-        assignedByAgentId: assigner,
-        startedAt: i === 0 ? Date.now() : null,
-      });
+    await db.insert(tasks).values({
+      id: taskId,
+      sessionId,
+      title: generated.title,
+      description: generated.description,
+      resources: JSON.stringify(generated.resources ?? []),
+      guidanceTips: JSON.stringify(generated.guidanceTips ?? []),
+      starterMessage: generated.starterMessage ?? null,
+      deadlineMinutes: generated.deadlineMinutes ?? 15,
+      sortOrder: 1,
+      status: 'started',
+      difficulty: generated.difficulty ?? 1,
+      waitingAgentId: waiting,
+      assignedByAgentId: assigner,
+      startedAt,
+    });
 
-      if (i === 0) {
-        firstTaskId = taskId;
-        firstAssigner = assigner;
-        firstStarter = task.starterMessage ?? null;
-      }
-    }
-
-    // Seed the first task's starter message into the chat with the assigning agent
-    if (firstAssigner && firstStarter) {
+    if (assigner && generated.starterMessage) {
       await db.insert(messages).values({
         id: randomUUID(),
         sessionId,
-        agentId: firstAssigner,
+        agentId: assigner,
         role: 'assistant',
-        content: firstStarter,
-        timestamp: Date.now(),
+        content: generated.starterMessage,
+        timestamp: startedAt,
       });
     }
 
-    return NextResponse.json({ sessionId });
+    return NextResponse.json({ sessionId, totalTasks });
   } catch (err: any) {
     console.error('POST /api/sessions failed', err);
     const message = process.env.NODE_ENV === 'production'

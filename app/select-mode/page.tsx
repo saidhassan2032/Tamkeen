@@ -10,17 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/brand/Logo';
 import { LoadingMark } from '@/components/brand/LoadingMark';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { Zap, Calendar, Check } from 'lucide-react';
+import { Zap, Calendar } from 'lucide-react';
 
 export default function SelectModePage() {
   const router = useRouter();
   const {
     selectedMajorId,
     selectedTrackId,
-    selectedMode,
-    selectedDuration,
-    setMode,
-    setDuration,
     setSession,
   } = useSimulationStore();
   const [loading, setLoading] = useState(false);
@@ -34,7 +30,7 @@ export default function SelectModePage() {
 
   const trackTitle = TRACK_TITLES[selectedTrackId] ?? selectedTrackId;
 
-  async function startSession(mode: 'quick' | 'extended', duration?: '1week' | '2weeks') {
+  async function startSession(mode: 'quick' | 'extended') {
     setError(null);
     setLoading(true);
     try {
@@ -45,7 +41,6 @@ export default function SelectModePage() {
           trackId: selectedTrackId,
           majorId: selectedMajorId,
           mode,
-          duration: duration ?? null,
         }),
       });
       if (!res.ok) {
@@ -90,15 +85,8 @@ export default function SelectModePage() {
 
         <div className="grid md:grid-cols-2 gap-3">
           <button
-            onClick={() => {
-              setMode('quick');
-              startSession('quick');
-            }}
-            className={`text-right p-6 rounded-xl border bg-surface transition-all ${
-              selectedMode === 'quick'
-                ? 'border-brand bg-brand-soft'
-                : 'border-border hover:border-brand/40 hover:bg-surface2'
-            }`}
+            onClick={() => startSession('quick')}
+            className="text-right p-6 rounded-xl border border-border bg-surface hover:border-brand/40 hover:bg-surface2 transition-all"
           >
             <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center mb-4">
               <Zap className="w-5 h-5 text-brand" />
@@ -111,51 +99,19 @@ export default function SelectModePage() {
           </button>
 
           <button
-            onClick={() => setMode('extended')}
-            className={`text-right p-6 rounded-xl border bg-surface transition-all ${
-              selectedMode === 'extended'
-                ? 'border-brand bg-brand-soft'
-                : 'border-border hover:border-brand/40 hover:bg-surface2'
-            }`}
+            onClick={() => startSession('extended')}
+            className="text-right p-6 rounded-xl border border-border bg-surface hover:border-brand/40 hover:bg-surface2 transition-all"
           >
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center mb-4">
               <Calendar className="w-5 h-5 text-accent" />
             </div>
             <h3 className="text-base font-semibold mb-1.5">محاكاة موسّعة</h3>
             <p className="text-sm text-text-secondary leading-relaxed mb-4">
-              تجربة عميقة مع مهام متصاعدة. اختر مدّتها.
+              تجربة عميقة مع 5 مهام متصاعدة. مثالية للاستعداد للواقع.
             </p>
-            <Badge variant="outline">5-8 مهام</Badge>
+            <Badge variant="outline">~ 30 دقيقة</Badge>
           </button>
         </div>
-
-        {selectedMode === 'extended' && (
-          <div className="mt-8 p-6 rounded-xl border border-border bg-surface">
-            <h3 className="text-sm font-semibold mb-4 text-text-secondary">اختر المدّة</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={() => {
-                  setDuration('1week');
-                  startSession('extended', '1week');
-                }}
-                variant={selectedDuration === '1week' ? 'default' : 'outline'}
-                className="h-14"
-              >
-                أسبوع — 5 مهام
-              </Button>
-              <Button
-                onClick={() => {
-                  setDuration('2weeks');
-                  startSession('extended', '2weeks');
-                }}
-                variant={selectedDuration === '2weeks' ? 'default' : 'outline'}
-                className="h-14"
-              >
-                أسبوعين — 8 مهام
-              </Button>
-            </div>
-          </div>
-        )}
 
         {error && (
           <div className="mt-6 p-4 rounded-lg bg-danger/10 border border-danger/30 text-sm text-danger">

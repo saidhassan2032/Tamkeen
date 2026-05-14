@@ -65,7 +65,7 @@ export function makeTaskPrompt(
   اصنع مهمة جديدة مختصرة وواقعية. starterMessage يحوي محتوى ابتدائي عملي.`;
 }
 
-async function generateOneTask(
+export async function generateOneTask(
   trackId: string,
   companyContext: string,
   index: number,
