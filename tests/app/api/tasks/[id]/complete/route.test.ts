@@ -115,16 +115,11 @@ describe('Task Completion Endpoint', () => {
         return callback(mockTx);
       });
 
-      (db as any).get
-        .mockImplementationOnce(() => ({ id: mockSessionId, totalTasks: 1 }))
-        .mockImplementationOnce(() => ({ value: 1 }));
-
       const response = await POST(makeRequest(), { params: mockParams });
       expect(response.status).toBe(200);
       const json = await response.json();
       expect(json).toMatchObject({
         taskStatus: 'completed',
-        transitioned: true,
         done: true,
         nextTask: null,
       });

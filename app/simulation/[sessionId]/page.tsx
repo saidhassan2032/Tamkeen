@@ -148,23 +148,6 @@ export default function SimulationPage() {
   }, [sessionId, loadSession]);
 
   useEffect(() => {
-    if (!sessionId) return;
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const res = await fetch(`/api/sessions/${sessionId}/stream`, { signal: controller.signal });
-        if (!res.body) return;
-        const reader = res.body.getReader();
-        while (!controller.signal.aborted) {
-          const { done } = await reader.read();
-          if (done) break;
-        }
-      } catch {}
-    })();
-    return () => controller.abort();
-  }, [sessionId]);
-
-  useEffect(() => {
     if (!currentTask?.startedAt) return;
     warned5MinRef.current = false;
     warned2MinRef.current = false;
