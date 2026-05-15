@@ -1,8 +1,9 @@
 export const MAJORS = [
   { id: 'cs',         icon: '💻', title: 'علوم الحاسب وهندسة البرمجيات', description: 'من تطوير المواقع إلى إدارة المشاريع التقنية', color: '#3B82F6' },
-  { id: 'accounting', icon: '📊', title: 'المحاسبة',                      description: 'من أمين الصندوق إلى المدقق المالي',             color: '#10B981' },
+  { id: 'accounting', icon: '📊', title: 'المحاسبة',                      description: 'من المحاسب العام إلى المدقق المالي',            color: '#10B981' },
   { id: 'business',   icon: '📈', title: 'إدارة الأعمال',                 description: 'قيادة المشاريع وإدارة الفرق',                   color: '#F59E0B' },
   { id: 'design',     icon: '🎨', title: 'التصميم',                       description: 'من واجهات التطبيقات إلى التصميم الإبداعي',      color: '#EC4899' },
+  { id: 'media',      icon: '📢', title: 'الإعلام',                       description: 'من إنتاج المحتوى إلى الصحافة الرقمية',          color: '#8B5CF6' },
 ] as const;
 
 export type MajorId = typeof MAJORS[number]['id'];
@@ -14,7 +15,6 @@ export const TRACKS: Record<string, ReadonlyArray<{ id: string; icon: string; ti
     { id: 'ux',          icon: '🎯', title: 'مصمم تجربة المستخدم UX',         duration: '20 دقيقة' },
   ],
   accounting: [
-    { id: 'cashier',     icon: '💰', title: 'أمين صندوق',                     duration: '15 دقيقة' },
     { id: 'accountant',  icon: '📋', title: 'محاسب عام',                       duration: '20 دقيقة' },
     { id: 'auditor',     icon: '🔍', title: 'مدقق مالي',                       duration: '25 دقيقة' },
   ],
@@ -24,6 +24,9 @@ export const TRACKS: Record<string, ReadonlyArray<{ id: string; icon: string; ti
   design: [
     { id: 'ui_designer', icon: '📱', title: 'مصمم واجهات التطبيقات والمواقع', duration: '20 دقيقة' },
     { id: 'graphic',     icon: '🖼️', title: 'مصمم قوالب وبوسترات',            duration: '15 دقيقة' },
+  ],
+  media: [
+    { id: 'content_writer', icon: '✍️', title: 'كاتب محتوى',                  duration: '20 دقيقة' },
   ],
 };
 
@@ -99,18 +102,24 @@ export const AGENT_TEMPLATES: Record<string, AgentTemplate> = {
     colleague1: { name: 'ديما السهلي',  roleTitle: 'Copywriter',          personality: 'تعطيك النصوص الجاهزة، تنتظر منك التصميم مع النص',         roleInTask: 'تنتظر التصميم النهائي لإرساله',      avatarBg: '#FCE7F3', avatarColor: '#9D174D', icon: '👩‍💼' },
     colleague2: { name: 'علي الزيد',    roleTitle: 'Social Media Manager', personality: 'يحتاج assets بمقاسات منصات محددة، دائماً مستعجل',        roleInTask: 'ينتظر الـ assets للنشر',             avatarBg: '#DBEAFE', avatarColor: '#1D4ED8', icon: '👨‍💼' },
   },
+  content_writer: {
+    company: 'وكالة محتوى رقمي — عملاء في السوق السعودي والخليجي',
+    manager:    { name: 'لمياء الغامدي',  roleTitle: 'Content Manager',     personality: 'تريد محتوى يخدم الهدف التسويقي، تعطي feedback سريع ومباشر', roleInTask: 'تعطيك الموضوع والهدف وتراجع المسودة', avatarBg: '#EDE9FE', avatarColor: '#5B21B6', icon: '👩‍💼' },
+    colleague1: { name: 'سعود المالكي',   roleTitle: 'SEO Specialist',      personality: 'يفكر بالكلمات المفتاحية والترتيب، ينتظر المحتوى للمراجعة',  roleInTask: 'ينتظر المحتوى لتحسينه لمحركات البحث', avatarBg: '#DBEAFE', avatarColor: '#1D4ED8', icon: '👨‍💻' },
+    colleague2: { name: 'رنا الشهري',     roleTitle: 'Social Media Manager', personality: 'تحتاج محتوى جاهزاً للنشر، دائماً تضغط على المواعيد',      roleInTask: 'تنتظر المحتوى لجدولة النشر',          avatarBg: '#FCE7F3', avatarColor: '#9D174D', icon: '👩‍💼' },
+  },
 };
 
 export const TRACK_TITLES: Record<string, string> = {
   web_dev: 'مطوّر مواقع',
   tech_pm: 'مدير المشاريع التقنية',
   ux: 'مصمم تجربة المستخدم UX',
-  cashier: 'أمين صندوق',
   accountant: 'محاسب عام',
   auditor: 'مدقق مالي',
   project_mgr: 'مدير مشاريع',
   ui_designer: 'مصمم واجهات التطبيقات والمواقع',
   graphic: 'مصمم قوالب وبوسترات',
+  content_writer: 'كاتب محتوى',
 };
 
 export interface TaskResource {
