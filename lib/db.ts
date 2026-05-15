@@ -51,6 +51,7 @@ export const sessions = sqliteTable('sessions', {
   companyContext: text('company_context').notNull(),
   startedAt:      integer('started_at').notNull(),
   endedAt:        integer('ended_at'),
+  tasksGenerationDone: integer('tasks_generation_done').notNull().default(0),
 });
 
 export const agents = sqliteTable('agents', {

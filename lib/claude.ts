@@ -7,7 +7,6 @@
  */
 
 export {
-  generateTasks,
   generateOneTask,
   streamAgentReply,
   getGuidance,

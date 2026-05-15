@@ -99,7 +99,7 @@ describe('Task Completion Endpoint', () => {
       expect(json).toMatchObject(completedTaskShape);
     });
 
-    test('should return done=true when no pending tasks exist', async () => {
+    test('should return done=true when all tasks completed', async () => {
       (db.transaction as jest.Mock).mockImplementation((callback) => {
         const mockTx = {
           select: jest.fn().mockReturnThis(),
@@ -108,6 +108,8 @@ describe('Task Completion Endpoint', () => {
           orderBy: jest.fn().mockReturnThis(),
           get: jest.fn()
             .mockImplementationOnce(() => ({ ...baseTask, status: 'completed', completedAt: Date.now() }))
+            .mockImplementationOnce(() => null)
+            .mockImplementationOnce(() => ({ totalTasks: 5, tasksGenerationDone: 1 }))
             .mockImplementationOnce(() => null),
           update: jest.fn().mockReturnThis(),
           set: jest.fn().mockReturnThis(),
@@ -122,6 +124,33 @@ describe('Task Completion Endpoint', () => {
         taskStatus: 'completed',
         done: true,
         nextTask: null,
+      });
+    });
+
+    test('should return notReady when generation still in progress', async () => {
+      (db.transaction as jest.Mock).mockImplementation((callback) => {
+        const mockTx = {
+          select: jest.fn().mockReturnThis(),
+          from: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          orderBy: jest.fn().mockReturnThis(),
+          get: jest.fn()
+            .mockImplementationOnce(() => ({ ...baseTask, status: 'completed', completedAt: Date.now() }))
+            .mockImplementationOnce(() => null)
+            .mockImplementationOnce(() => ({ totalTasks: 5, tasksGenerationDone: 0 }))
+            .mockImplementationOnce(() => null),
+          update: jest.fn().mockReturnThis(),
+          set: jest.fn().mockReturnThis(),
+        };
+        return callback(mockTx);
+      });
+
+      const response = await POST(makeRequest(), { params: mockParams });
+      expect(response.status).toBe(200);
+      const json = await response.json();
+      expect(json).toMatchObject({
+        taskStatus: 'completed',
+        notReady: true,
       });
     });
   });

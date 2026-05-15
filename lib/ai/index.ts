@@ -123,32 +123,6 @@ export async function generateOneTask(
   }
 }
 
-export async function generateTasks(
-  trackId: string,
-  companyContext: string,
-  mode: string,
-  agents: AgentInfo[],
-  duration?: string | null,
-): Promise<GeneratedTask[]> {
-  const count = mode === 'quick' ? 3 : duration === '1week' ? 5 : 8;
-
-  const tasks: GeneratedTask[] = [];
-  const prevTasks: { title: string; description: string }[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const task = await generateOneTask(trackId, companyContext, i, count, prevTasks, agents);
-    if (task) {
-      tasks.push(task);
-      prevTasks.push({ title: task.title, description: task.description });
-    }
-  }
-
-  if (tasks.length === 0) {
-    throw new Error('لم يُرجع أي مهام، حاول مجدداً');
-  }
-  return tasks;
-}
-
 // ── Deadline from difficulty ──────────────────────────────────────────────
 
 const TIME_BY_DIFFICULTY: Record<number, { min: number; max: number }> = {

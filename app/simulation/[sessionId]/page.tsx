@@ -240,6 +240,10 @@ export default function SimulationPage() {
       if (!res.ok) {
         throw new Error(data.error ?? 'حدث خطأ في الاتصال، حاول مجدداً');
       }
+      if (data.notReady) {
+        await pollUntilReady(currentTask.id);
+        return;
+      }
       if (data.done) {
         setCompletedByAi(null);
         setShowEndDialog(true);
@@ -273,6 +277,38 @@ export default function SimulationPage() {
       setTimeout(() => setNotification(null), 4000);
     } finally {
       setCompleting(false);
+    }
+  };
+
+  const pollUntilReady = async (taskId: string) => {
+    setTasks((prev) => prev.map((t) =>
+      t.id === taskId ? { ...t, status: 'completed' } : t
+    ));
+    setCompletedByAi(null);
+    while (true) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/poll-next`);
+        const data = await res.json();
+        if (data.ready && data.task) {
+          setTasks((prev) => {
+            if (prev.some(t => t.id === data.task.id)) return prev;
+            return [...prev, data.task];
+          });
+          if (data.task.starterMessage && data.task.assignedByAgentId) {
+            setConversations((prev) => ({
+              ...prev,
+              [data.task.assignedByAgentId]: [
+                ...(prev[data.task.assignedByAgentId] ?? []),
+                { role: 'assistant', content: data.task.starterMessage, timestamp: data.task.startedAt },
+              ],
+            }));
+          }
+          setAgent(data.task.assignedByAgentId);
+          setUnread((u) => ({ ...u, [data.task.assignedByAgentId]: false }));
+          return;
+        }
+      } catch {}
     }
   };
 

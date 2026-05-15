@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, tasks, messages } from '@/lib/db';
+import { db, sessions, tasks, messages } from '@/lib/db';
 import { eq, and, asc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
@@ -8,6 +8,7 @@ export const runtime = 'nodejs';
 export async function POST(_: NextRequest, { params }: { params: { id: string } }) {
   try {
     let done = false;
+    let notReady = false;
     let nextTask: any = null;
 
     await db.transaction(async (tx) => {
@@ -35,7 +36,24 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
         .get();
 
       if (!pending) {
-        done = true;
+        const session = await tx.select().from(sessions).where(eq(sessions.id, completedTask.sessionId)).get();
+        if (!session) {
+          done = true;
+          return;
+        }
+
+        const nextSortOrder = (completedTask.sortOrder ?? 0) + 1;
+        const nextExists = await tx
+          .select()
+          .from(tasks)
+          .where(and(eq(tasks.sessionId, completedTask.sessionId), eq(tasks.sortOrder, nextSortOrder)))
+          .get();
+
+        if (nextExists || session.tasksGenerationDone) {
+          done = true;
+        } else {
+          notReady = true;
+        }
         return;
       }
 
@@ -58,6 +76,10 @@ export async function POST(_: NextRequest, { params }: { params: { id: string } 
 
       nextTask = { ...pending, status: 'started', startedAt };
     });
+
+    if (notReady) {
+      return NextResponse.json({ taskStatus: 'completed', notReady: true });
+    }
 
     return NextResponse.json({
       taskStatus: 'completed',
