@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { db, sessions, agents, tasks, messages } from '@/lib/db';
 import { generateOneTask } from '@/lib/claude';
 import { generateRemainingTasks } from '@/lib/generateTasks';
@@ -111,15 +112,17 @@ export async function POST(req: NextRequest) {
 
     // Fire background generation for remaining tasks
     if (totalTasks > 1) {
-      generateRemainingTasks({
-        sessionId,
-        trackId,
-        companyContext: template.company,
-        totalTasks,
-        agentNames,
-        firstTaskTitle: generated.title,
-        firstTaskDescription: generated.description,
-      }).catch((err) => console.error('[background gen]', err));
+      waitUntil(
+        generateRemainingTasks({
+          sessionId,
+          trackId,
+          companyContext: template.company,
+          totalTasks,
+          agentNames,
+          firstTaskTitle: generated.title,
+          firstTaskDescription: generated.description,
+        }).catch((err) => console.error('[background gen]', err)),
+      );
     } else {
       // No remaining tasks, mark generation done
       await db.update(sessions).set({ tasksGenerationDone: 1 }).where(eq(sessions.id, sessionId));
