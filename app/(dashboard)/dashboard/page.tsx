@@ -56,12 +56,12 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
   const data = await fetchUserReports();
   const last = data.reports[0];
+  const hasReports = !!data.avg;
 
-  const technical    = data.avg?.quality       ?? 78;
-  const teamwork     = data.avg?.communication ?? 85;
-  const speed        = data.avg?.speed         ?? 92;
-  const overall      = data.avg?.overall       ?? Math.round((technical + teamwork + speed) / 3);
-  const isPlaceholder = !data.avg;
+  const technical = data.avg?.quality       ?? 0;
+  const teamwork  = data.avg?.communication ?? 0;
+  const speed     = data.avg?.speed         ?? 0;
+  const overall   = data.avg?.overall       ?? 0;
 
   const meta = verdictMeta(overall);
 
@@ -76,80 +76,84 @@ export default async function DashboardPage() {
             مرحباً، {user?.name?.split(' ')[0] ?? 'بك'} 👋
           </h1>
           <p className="text-sm text-text-muted">
-            هذه نظرة عامة على أدائك في جلسات المحاكاة.
+            {hasReports
+              ? 'هذه نظرة عامة على أدائك في جلسات المحاكاة.'
+              : 'لم تبدأ أي محاكاة بعد — ابدأ تجربتك الأولى لتظهر بياناتك هنا.'}
           </p>
         </div>
 
-        {/* Stat cards row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <StatCard value={technical} label="الكفاءة التقنية" color="brand" Icon={Cpu}
-            description="أداء تقني مستمر مع وجود فرص للتطوير في الجوانب المعمارية المتقدّمة." />
-          <StatCard value={teamwork} label="العمل الجماعي" color="accent" Icon={Users}
-            description="تواصل فعّال وروح تعاونية مميّزة بين أعضاء الفريق في حل المشكلات." />
-          <StatCard value={speed} label="السرعة" color="deep" Icon={Zap}
-            description="يتفوّق الفريق في تسليم المهام قبل الموعد المحدّد وبجودة عالية." />
-        </div>
-
-        {/* Decision card + AI analysis row */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-          {/* Decision card */}
-          <div className="lg:col-span-2 rounded-2xl border border-border bg-surface overflow-hidden">
-            <div className="relative h-44 md:h-48 bg-gradient-to-br from-brand via-brand to-text">
-              <div className="absolute inset-0 brand-glow opacity-60" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,106,0,0.25),transparent_55%)]" />
-              <div className="absolute top-3 start-3 text-[10px] uppercase tracking-wider text-white/80 bg-white/10 backdrop-blur px-2.5 py-1 rounded-full">
-                القرار النهائي
-              </div>
+        {hasReports && (
+          <>
+            {/* Stat cards row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <StatCard value={technical} label="الكفاءة التقنية" color="brand" Icon={Cpu}
+                description="أداء تقني مستمر مع وجود فرص للتطوير في الجوانب المعمارية المتقدّمة." />
+              <StatCard value={teamwork} label="العمل الجماعي" color="accent" Icon={Users}
+                description="تواصل فعّال وروح تعاونية مميّزة بين أعضاء الفريق في حل المشكلات." />
+              <StatCard value={speed} label="السرعة" color="deep" Icon={Zap}
+                description="يتفوّق الفريق في تسليم المهام قبل الموعد المحدّد وبجودة عالية." />
             </div>
-            <div className="p-5">
-              <div className="text-base md:text-lg font-bold mb-2">{meta.label}</div>
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={
-                      i < meta.stars
-                        ? 'w-4 h-4 fill-accent text-accent'
-                        : 'w-4 h-4 text-border'
-                    }
+
+            {/* Decision card + AI analysis row */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
+              {/* Decision card */}
+              <div className="lg:col-span-2 rounded-2xl border border-border bg-surface overflow-hidden">
+                <div className="relative h-44 md:h-48 bg-gradient-to-br from-brand via-brand to-text">
+                  <div className="absolute inset-0 brand-glow opacity-60" />
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,106,0,0.25),transparent_55%)]" />
+                  <div className="absolute top-3 start-3 text-[10px] uppercase tracking-wider text-white/80 bg-white/10 backdrop-blur px-2.5 py-1 rounded-full">
+                    القرار النهائي
+                  </div>
+                </div>
+                <div className="p-5">
+                  <div className="text-base md:text-lg font-bold mb-2">{meta.label}</div>
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className={
+                          i < meta.stars
+                            ? 'w-4 h-4 fill-accent text-accent'
+                            : 'w-4 h-4 text-border'
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* AI analysis */}
+              <div className="lg:col-span-3 rounded-2xl border border-border bg-surface p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <Sparkles className="w-4 h-4 text-accent" />
+                  <h2 className="text-base font-bold">تحليل الأداء الذكي</h2>
+                </div>
+                <div className="space-y-3">
+                  <AIQuote
+                    tag="سؤال"
+                    text='"أداء الفريق متماسك في سرعة التنفيذ، نلاحظ تحسّناً كبيراً في استجابة المطورين للمتطلبات الطارئة."'
                   />
-                ))}
+                  <AIQuote
+                    tag="جواب"
+                    text='"نحتاج للتركيز أكثر على توثيق الكود البرمجي لرفع الكفاءة التقنية على المدى البعيد."'
+                  />
+                  <AIQuote
+                    tag="فكر"
+                    text='"التعاون بين الفريق في أعلى مستوياته، الجميع مستعد للمساعدة في أي وقت."'
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-5 pt-4 border-t border-border">
+                  <span className="text-[11px] text-text-muted">
+                    {last && `تم التحديث في ${new Date(last.generatedAt).toLocaleDateString('ar')}`}
+                  </span>
+                  <Link href="/select-major">
+                    <Button size="sm" variant="outline" className="text-xs">جرّب مجالاً آخر</Button>
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* AI analysis */}
-          <div className="lg:col-span-3 rounded-2xl border border-border bg-surface p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <Sparkles className="w-4 h-4 text-accent" />
-              <h2 className="text-base font-bold">تحليل الأداء الذكي</h2>
-            </div>
-            <div className="space-y-3">
-              <AIQuote
-                tag="سؤال"
-                text='"أداء الفريق متماسك في سرعة التنفيذ، نلاحظ تحسّناً كبيراً في استجابة المطورين للمتطلبات الطارئة."'
-              />
-              <AIQuote
-                tag="جواب"
-                text='"نحتاج للتركيز أكثر على توثيق الكود البرمجي لرفع الكفاءة التقنية على المدى البعيد."'
-              />
-              <AIQuote
-                tag="فكر"
-                text='"التعاون بين الفريق في أعلى مستوياته، الجميع مستعد للمساعدة في أي وقت."'
-              />
-            </div>
-            <div className="flex items-center justify-between mt-5 pt-4 border-t border-border">
-              <span className="text-[11px] text-text-muted">
-                {last
-                  ? `تم التحديث في ${new Date(last.generatedAt).toLocaleDateString('ar')}`
-                  : 'لا يوجد تقارير سابقة بعد'}
-              </span>
-              <Link href="/select-major">
-                <Button size="sm" variant="outline" className="text-xs">جرّب مجالاً آخر</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+          </>
+        )}
 
         {/* Reports list + CTA */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
