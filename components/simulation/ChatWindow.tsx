@@ -187,7 +187,7 @@ export function ChatWindow({ agent, messages, streamingMessage, isTyping, onSend
             style={{ fieldSizing: 'content' } as any}
           />
           <Button onClick={handleSend} disabled={!canSend} size="icon" className="shrink-0">
-            {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 rotate-180" />}
+            {isTyping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 -scale-x-100" />}
           </Button>
         </div>
       </div>
