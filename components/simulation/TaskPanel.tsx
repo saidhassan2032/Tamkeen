@@ -11,6 +11,7 @@ interface Task {
   title: string;
   description: string;
   deadlineMinutes: number;
+  sortOrder: number;
   difficulty: number;
   status: string;
   startedAt: number | null;
@@ -45,7 +46,7 @@ export function TaskPanel({ task, timeRemaining, totalTasks, completedTasks, onC
     <div className="border-b border-border bg-surface p-5">
       <div className="flex items-center justify-between mb-4">
         <span className="text-[10px] uppercase tracking-wider text-text-muted">
-          مهمة {completedTasks + 1} من {totalTasks}
+          مهمة {task.sortOrder} من {totalTasks}
         </span>
         <Badge variant="outline" className="text-[10px]">صعوبة {task.difficulty}/5</Badge>
       </div>

@@ -50,6 +50,7 @@ interface Task {
   resources: string;
   guidanceTips: string;
   deadlineMinutes: number;
+  sortOrder: number;
   status: string;
   difficulty: number;
   startedAt: number | null;
