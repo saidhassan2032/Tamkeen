@@ -87,6 +87,7 @@ export const tasks = sqliteTable('tasks', {
   speedScore:         integer('speed_score'),
   communicationScore: integer('communication_score'),
   verdict:            text('verdict'),
+  extensions:         integer('extensions').notNull().default(0),
 });
 
 export const messages = sqliteTable('messages', {

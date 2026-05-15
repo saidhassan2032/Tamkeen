@@ -19,7 +19,7 @@ interface ReportPayload {
   strengths: string[];
   improvements: string[];
   agentFeedbacks: Record<string, string>;
-  taskScores: Array<{ title: string; quality?: number | null; speed?: number | null; communication?: number | null; verdict?: string | null }>;
+  taskScores: Array<{ title: string; quality?: number | null; speed?: number | null; communication?: number | null; verdict?: string | null; extensions?: number }>;
   recommendation?: string;
   generatedAt: number;
   error?: string;
@@ -74,6 +74,7 @@ export default async function ReportPage({ params }: { params: { reportId: strin
 
   const meta = verdictMeta(report.overallScore);
   const feedbackEntries = Object.entries(report.agentFeedbacks ?? {});
+  const totalExtensions = (report.taskScores ?? []).reduce((sum, t) => sum + (t.extensions ?? 0), 0);
 
   return (
     <>
@@ -104,6 +105,14 @@ export default async function ReportPage({ params }: { params: { reportId: strin
             description="يتفوّق الفريق في تسليم المهام قبل الموعد المحدّد وبجودة عالية."
           />
         </div>
+
+        {totalExtensions > 0 && (
+          <div className="rounded-2xl border border-warning/30 bg-warning/5 p-4">
+            <p className="text-sm text-warning">
+              تم تمديد الوقت {totalExtensions} مرة خلال المحاكاة
+            </p>
+          </div>
+        )}
 
         {/* Decision + AI analysis */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">

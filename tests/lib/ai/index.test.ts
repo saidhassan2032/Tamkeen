@@ -60,9 +60,9 @@ describe('Sequential Task Generation', () => {
   describe('generateTasks', () => {
     test('should generate tasks sequentially with context propagation', async () => {
       const mockTasks = [
-        { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, workflowType: 'self_contained', waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
-        { title: 'المهمة 2', description: 'الوصف 2', resources: [], deadlineMinutes: 45, workflowType: 'delegated', waitingAgentId: 'colleague_1', assignedByAgentId: 'manager', difficulty: 2, guidanceTips: [], starterMessage: 'رسالة البداية 2' },
-        { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, workflowType: 'handoff', waitingAgentId: 'colleague_2', assignedByAgentId: 'manager', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
+        { title: 'المهمة 1', description: 'الوصف 1', resources: [], workflowType: 'self_contained', waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
+        { title: 'المهمة 2', description: 'الوصف 2', resources: [], workflowType: 'delegated', waitingAgentId: 'colleague_1', assignedByAgentId: 'manager', difficulty: 2, guidanceTips: [], starterMessage: 'رسالة البداية 2' },
+        { title: 'المهمة 3', description: 'الوصف 3', resources: [], workflowType: 'handoff', waitingAgentId: 'colleague_2', assignedByAgentId: 'manager', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
       ];
 
       // Mock generateText to return different tasks based on call count
@@ -110,11 +110,11 @@ describe('Sequential Task Generation', () => {
     test('should handle partial failures and return successful tasks', async () => {
       // Mock generateText to fail on second call, succeed on others
       (generateText as jest.Mock).mockImplementationOnce(() => ({
-        output: { title: 'المهمة 1', description: 'الوصف 1', resources: [], deadlineMinutes: 30, workflowType: 'self_contained', waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
+        output: { title: 'المهمة 1', description: 'الوصف 1', resources: [], workflowType: 'self_contained', waitingAgentId: 'manager', assignedByAgentId: 'manager', difficulty: 1, guidanceTips: [], starterMessage: 'رسالة البداية 1' },
       })).mockImplementationOnce(() => {
         throw new Error('AI service error');
       }).mockImplementationOnce(() => ({
-        output: { title: 'المهمة 3', description: 'الوصف 3', resources: [], deadlineMinutes: 60, workflowType: 'delegated', waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
+        output: { title: 'المهمة 3', description: 'الوصف 3', resources: [], workflowType: 'delegated', waitingAgentId: 'colleague_2', assignedByAgentId: 'colleague_2', difficulty: 3, guidanceTips: [], starterMessage: 'رسالة البداية 3' },
       }));
 
       const result = await generateTasks(mockTrackId, mockCompanyContext, 'quick', mockAgents);

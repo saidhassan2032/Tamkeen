@@ -84,18 +84,18 @@ export default function SimulationPage() {
   const [showEndDialog, setShowEndDialog] = useState(false);
   const [redirectingToReport, setRedirectingToReport] = useState(false);
   const [completedByAi, setCompletedByAi] = useState<string | null>(null);
-  const [blockedDialog, setBlockedDialog] = useState<{
-    taskStatus: string;
-    feedback: string;
-    skipWarning: string;
-  } | null>(null);
+  const [extendDialog, setExtendDialog] = useState(false);
+  const [extending, setExtending] = useState(false);
 
   const warned5MinRef = useRef(false);
   const warned2MinRef = useRef(false);
   const expiredHandledRef = useRef(false);
+  const isCompletedRef = useRef(false);
 
   const currentTask = tasks.find((t) => t.status === 'started' || t.status === 'largely')
     ?? (completedByAi ? tasks.find(t => t.id === completedByAi) : undefined);
+
+  isCompletedRef.current = currentTask?.status === 'completed';
   const completedCount = tasks.filter((t) => t.status === 'completed').length;
   const activeAgent = agents.find((a) => a.id === activeAgentId) ?? agents[0];
   const isTyping = typingAgentId === activeAgent?.id;
@@ -185,9 +185,9 @@ export default function SimulationPage() {
         setNotification({ message: '🚨 تبقّى دقيقتان فقط!', type: 'danger' });
         setTimeout(() => setNotification(null), 5000);
       }
-      if (!expiredHandledRef.current && remaining === 0) {
+      if (!expiredHandledRef.current && remaining === 0 && !isCompletedRef.current) {
         expiredHandledRef.current = true;
-        setNotification({ message: '⌛ انتهى الوقت — يمكنك إنهاء المهمة الآن', type: 'danger' });
+        setExtendDialog(true);
       }
     };
     tick();
@@ -257,14 +257,6 @@ export default function SimulationPage() {
       if (!res.ok) {
         throw new Error(data.error ?? 'حدث خطأ في الاتصال، حاول مجدداً');
       }
-      if (data.blocked) {
-        setBlockedDialog({
-          taskStatus: data.taskStatus,
-          feedback: data.feedback,
-          skipWarning: data.skipWarning,
-        });
-        return;
-      }
       if (data.done) {
         setCompletedByAi(null);
         setShowEndDialog(true);
@@ -301,49 +293,29 @@ export default function SimulationPage() {
     }
   };
 
-  const handleSkip = async () => {
-    if (!currentTask || !blockedDialog) return;
-    setBlockedDialog(null);
-    setCompleting(true);
+  const handleExtend = async (minutes: number) => {
+    if (!currentTask) return;
+    setExtending(true);
     try {
-      const res = await fetch(`/api/tasks/${currentTask.id}/complete?force=true`, { method: 'POST' });
+      const res = await fetch(`/api/tasks/${currentTask.id}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minutes }),
+      });
+      if (!res.ok) throw new Error('حدث خطأ في تمديد الوقت');
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error ?? 'حدث خطأ');
-      }
-      if (data.done) {
-        setCompletedByAi(null);
-        setShowEndDialog(true);
-      } else if (data.nextTask) {
-        setCompletedByAi(null);
-        setTasks((prev) => {
-          const updated = prev.map((t) => {
-            if (t.id === currentTask.id) return { ...t, status: 'completed' };
-            if (t.id === data.nextTask.id) return data.nextTask;
-            return t;
-          });
-          if (!prev.some(t => t.id === data.nextTask.id)) {
-            updated.push(data.nextTask);
-          }
-          return updated;
-        });
-        if (data.nextTask.starterMessage && data.nextTask.assignedByAgentId) {
-          setConversations((prev) => ({
-            ...prev,
-            [data.nextTask.assignedByAgentId]: [
-              ...(prev[data.nextTask.assignedByAgentId] ?? []),
-              { role: 'assistant', content: data.nextTask.starterMessage, timestamp: data.nextTask.startedAt },
-            ],
-          }));
-        }
-        setAgent(data.nextTask.assignedByAgentId);
-        setUnread((u) => ({ ...u, [data.nextTask.assignedByAgentId]: false }));
-      }
+      setTasks((prev) => prev.map((t) =>
+        t.id === currentTask.id
+          ? { ...t, deadlineMinutes: data.deadlineMinutes, extensions: data.extensions }
+          : t
+      ));
+      setExtendDialog(false);
+      expiredHandledRef.current = false;
     } catch (err: any) {
-      setNotification({ message: err.message ?? 'حدث خطأ في الاتصال، حاول مجدداً', type: 'danger' });
+      setNotification({ message: err.message, type: 'danger' });
       setTimeout(() => setNotification(null), 4000);
     } finally {
-      setCompleting(false);
+      setExtending(false);
     }
   };
 
@@ -456,31 +428,38 @@ export default function SimulationPage() {
         </aside>
       </div>
 
-      <Dialog open={!!blockedDialog} onOpenChange={(open) => { if (!open) setBlockedDialog(null); }}>
+      <Dialog open={extendDialog} onOpenChange={(open) => { if (!open) setExtendDialog(false); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {blockedDialog?.taskStatus === 'largely' ? 'المهمة شبه منجزة' : 'المهمة لم تنجز بعد'}
-            </DialogTitle>
-            <DialogDescription className="text-right">
-              <p className="mb-3 text-sm">{blockedDialog?.feedback}</p>
-              <p className="text-xs text-warning font-medium">{blockedDialog?.skipWarning}</p>
+            <DialogTitle>انتهى الوقت!</DialogTitle>
+            <DialogDescription>
+              اختر مدة التمديد لإكمال المهمة
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setBlockedDialog(null)}
+              onClick={() => handleExtend(15)}
+              disabled={extending}
               className="flex-1"
             >
-              متابعة العمل
+              تمديد 15 دقيقة
             </Button>
             <Button
-              variant="destructive"
-              onClick={handleSkip}
+              variant="outline"
+              onClick={() => handleExtend(30)}
+              disabled={extending}
               className="flex-1"
             >
-              تخطي المهمة
+              تمديد 30 دقيقة
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleExtend(45)}
+              disabled={extending}
+              className="flex-1"
+            >
+              تمديد 45 دقيقة
             </Button>
           </DialogFooter>
         </DialogContent>

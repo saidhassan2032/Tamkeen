@@ -34,7 +34,6 @@ const TaskResourceSchema = z.object({
 const TaskSchema = z.object({
   title: z.string().describe('اسم المهمة (5-10 كلمات)'),
   description: z.string().describe('وصف مختصر للمهمة (سطر-سطرين)'),
-  deadlineMinutes: z.number().int().min(10).max(180),
   difficulty: z.number().int().min(1).max(5),
   workflowType: z.enum(['self_contained', 'delegated', 'handoff']),
   waitingAgentId: z.enum(['manager', 'colleague_1', 'colleague_2']),
@@ -110,7 +109,9 @@ export async function generateOneTask(
       output: Output.object({ schema: TaskSchema, name: 'task' }),
       prompt: makeTaskPrompt(trackId, companyContext, index, total, prevTasks, agents),
     });
-    return result.output as GeneratedTask;
+    const output = result.output as GeneratedTask;
+    output.deadlineMinutes = computeDeadlineMinutes(output.difficulty);
+    return output;
   } catch (err) {
     if (NoObjectGeneratedError.isInstance(err)) {
       console.error(`[generateOneTask #${index}] text:`, err.text);
@@ -148,31 +149,30 @@ export async function generateTasks(
   return tasks;
 }
 
-// ── Chat output schema ────────────────────────────────────────────────────
+// ── Deadline from difficulty ──────────────────────────────────────────────
 
-const ChatScoreSchema = z.object({
-  quality: z.number().int().min(1).max(10).catch(0),
-  speed: z.number().int().min(1).max(10).catch(0),
-  communication: z.number().int().min(1).max(10).catch(0),
-  verdict: z.string(),
-});
+const TIME_BY_DIFFICULTY: Record<number, { min: number; max: number }> = {
+  1: { min: 30, max: 45 },
+  2: { min: 30, max: 60 },
+  3: { min: 45, max: 90 },
+  4: { min: 60, max: 120 },
+  5: { min: 90, max: 180 },
+};
+
+export function computeDeadlineMinutes(difficulty: number): number {
+  const range = TIME_BY_DIFFICULTY[Math.min(5, Math.max(1, difficulty))];
+  return range.min + Math.floor(Math.random() * (range.max - range.min + 1));
+}
+
+// ── Chat output schema ────────────────────────────────────────────────────
 
 const ChatReplySchema = z.object({
   reply: z.string().describe('ردك للمستخدم بعامية سعودية، 3-4 جمل'),
-  score: ChatScoreSchema.optional(),
   taskState: z.enum(['started', 'largely', 'completed']),
 });
 
-export interface ChatScore {
-  quality: number;
-  speed: number;
-  communication: number;
-  verdict: string;
-}
-
 export interface StreamReplyResult {
   text: string;
-  score?: ChatScore;
   taskState: 'started' | 'largely' | 'completed';
 }
 
@@ -218,20 +218,14 @@ function makeSystemPrompt(
   taskTitle: string,
   taskDescription: string,
   timeRemainingMinutes: number,
-  shouldEvaluate: boolean,
   agentRole: string,
   crossContext: string,
   otherAgentName: string,
   workflowType: string,
 ) {
-  const evalInstruction = shouldEvaluate
-    ? '\n- قيّم أداء المستخدم في حقل score (quality, speed, communication, verdict)'
-    : '';
-
   let workflowInstruction = '';
   if (agentRole === 'collaborator') {
-    workflowInstruction = `\n- المستخدم جاك بناءً على توجيه المسؤول عن المهمة. تعاون معه لإنجاز الشغل.
-- أنت المسؤول عن تقييم المهمة — قيم وحدد إذا انتهت.`;
+    workflowInstruction = `\n- المستخدم جاك بناءً على توجيه المسؤول عن المهمة. تعاون معه لإنجاز الشغل.`;
   } else if (agentRole === 'reviewer') {
     workflowInstruction = `\n- المستخدم اشتغل على المهمة مع شخص ثاني وجاك عشان تراجع شغله. راجع واعطه ملاحظاتك.
 - لا تحط completed إلا بعد ما تراجع الشغل كامل وتتأكد إنه تمام.`;
@@ -276,7 +270,7 @@ function makeSystemPrompt(
 - حدّد مرحلة إنجاز المهمة في حقل taskState:
   • started: المستخدم ما زال في البداية أو العمل قليل
   • largely: أغلب العمل تم لكن يحتاج تحسينات
-  • completed: المهمة منجزة بالكامل — في هذه الحالة أخبر المستخدم أنه خلص المهمة واطلب منه يضغط على زر "إنهاء المهمة" عشان ينتقل للجاية${evalInstruction}${crossContextBlock}`;
+   • completed: المهمة منجزة بالكامل — في هذه الحالة أخبر المستخدم أنه خلص المهمة واطلب منه يضغط على زر "إنهاء المهمة" عشان ينتقل للجاية${crossContextBlock}`;
 }
 
 export async function streamAgentReply(
@@ -290,7 +284,6 @@ export async function streamAgentReply(
   taskDescription: string,
   timeRemainingMinutes: number,
   conversationHistory: HistoryItem[],
-  shouldEvaluate: boolean,
   agentRole: string,
   crossContext: string,
   otherAgentName: string,
@@ -317,7 +310,6 @@ export async function streamAgentReply(
       taskTitle,
       taskDescription,
       timeRemainingMinutes,
-      shouldEvaluate,
       agentRole,
       crossContext,
       otherAgentName,
@@ -329,7 +321,6 @@ export async function streamAgentReply(
   let latestReply = '';
   let finalOutput: {
     reply: string;
-    score?: ChatScore;
     taskState: 'started' | 'largely' | 'completed';
   };
 
@@ -345,7 +336,6 @@ export async function streamAgentReply(
 
     finalOutput = (await result.output) as {
       reply: string;
-      score?: ChatScore;
       taskState: 'started' | 'largely' | 'completed';
     };
   } catch (err: any) {
@@ -362,9 +352,66 @@ export async function streamAgentReply(
 
   return {
     text: finalOutput.reply,
-    score: finalOutput.score,
     taskState: finalOutput.taskState,
   };
+}
+
+// ── Post-task evaluator ────────────────────────────────────────────────────
+
+export interface TaskEvalResult {
+  quality: number;
+  speed: number;
+  communication: number;
+  verdict: string;
+}
+
+const EvaluationSchema = z.object({
+  quality: z.number().int().min(1).max(10),
+  speed: z.number().int().min(1).max(10),
+  communication: z.number().int().min(1).max(10),
+  verdict: z.string().describe('تقييم مختصر للمهمة (جملتين)'),
+});
+
+export async function evaluateTask(
+  taskTitle: string,
+  taskDescription: string,
+  difficulty: number,
+  extensions: number,
+  trackTitle: string,
+  companyContext: string,
+  conversation: string,
+): Promise<TaskEvalResult | null> {
+  try {
+    const result = await generateText({
+      model: getModel('report'),
+      maxOutputTokens: 1000,
+      output: Output.object({ schema: EvaluationSchema, name: 'evaluation' }),
+      prompt: `أنت محلل أداء محايد.
+
+المسار الوظيفي: ${trackTitle}
+بيئة العمل: ${companyContext}
+المهمة: ${taskTitle}
+وصف المهمة: ${taskDescription}
+صعوبة المهمة: ${difficulty}/5
+عدد مرات تمديد الوقت: ${extensions}
+
+محادثة المستخدم مع الزملاء حول هذه المهمة:
+${conversation}
+
+قيّم أداء المستخدم بناءً على المحادثة أعلاه فقط.
+
+مقياس التقييم:
+- Quality (1-10): 1-3 = مخرجات خاطئة أو بدون مخرجات, 4-5 = غير مكتمل مع أخطاء كبيرة, 6-7 = مقبول مع بعض الملاحظات, 8 = جيد مع تحسينات بسيطة, 9-10 = شامل ومتقن
+- Speed (1-10): ضع في اعتبارك عدد مرات تمديد الوقت (${extensions}). 1-3 = مدد الوقت عدة مرات أو بطيء جداً, 4-5 = احتاج تمديد, 6-7 = مناسب, 8 = جيد, 9-10 = سريع ومبادر
+- Communication (1-10): 1-3 = لا يتواصل أو غير مهذب, 4-5 = تواصل محدود/غير واضح, 6-7 = مناسب, 8 = واضح, 9-10 = مبادر واحترافي
+
+كن صارماً ومنصفاً في تقييمك.`,
+    });
+    return result.output as TaskEvalResult;
+  } catch (err) {
+    console.error('[evaluateTask]', String(err));
+    return null;
+  }
 }
 
 // ── Manager guidance hint ─────────────────────────────────────────────────
@@ -392,6 +439,16 @@ export async function getGuidance(
 
 // ── Report generation ─────────────────────────────────────────────────────
 
+export interface TaskScoreEntry {
+  title: string;
+  quality: number | null;
+  speed: number | null;
+  communication: number | null;
+  difficulty: number;
+  extensions: number;
+  verdict: string | null;
+}
+
 export interface ReportData {
   overallScore: number;
   qualityScore: number;
@@ -404,11 +461,7 @@ export interface ReportData {
   recommendation?: string;
 }
 
-const ReportSchema = z.object({
-  overallScore: z.number().int().min(0).max(100),
-  qualityScore: z.number().int().min(0).max(100),
-  speedScore: z.number().int().min(0).max(100),
-  communicationScore: z.number().int().min(0).max(100),
+const ReportNarrativeSchema = z.object({
   verdict: z.string().describe('تقييم شامل 3-4 جمل'),
   strengths: z.array(z.string()).min(2),
   improvements: z.array(z.string()).min(1),
@@ -420,6 +473,24 @@ const ReportSchema = z.object({
   recommendation: z.string(),
 });
 
+function avg(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function computeAggregatedScores(taskScores: TaskScoreEntry[]) {
+  const qualities = taskScores.map((t) => t.quality).filter((s): s is number => s !== null);
+  const speeds = taskScores.map((t) => t.speed).filter((s): s is number => s !== null);
+  const comms = taskScores.map((t) => t.communication).filter((s): s is number => s !== null);
+
+  const qualityScore = Math.round(avg(qualities) * 10);
+  const speedScore = Math.round(avg(speeds) * 10);
+  const communicationScore = Math.round(avg(comms) * 10);
+  const overallScore = Math.round((qualityScore + speedScore + communicationScore) / 3);
+
+  return { overallScore, qualityScore, speedScore, communicationScore };
+}
+
 export async function generateReport(
   trackTitle: string,
   companyContext: string,
@@ -427,26 +498,49 @@ export async function generateReport(
   tasksCompleted: number,
   totalTasks: number,
   conversationsSummary: string,
+  taskScores: TaskScoreEntry[],
 ): Promise<ReportData> {
+  const quantitative = computeAggregatedScores(taskScores);
+
+  const taskScoresText = taskScores
+    .map(
+      (t) =>
+        `${t.title}: جودة=${t.quality ?? '-'}/10, سرعة=${t.speed ?? '-'}/10, تواصل=${t.communication ?? '-'}/10, ${t.extensions > 0 ? `تمديد الوقت ${t.extensions} مرة, ` : ''}تقييم="${t.verdict ?? '-'}"`,
+    )
+    .join('\n');
+
   try {
     const result = await generateText({
       model: getModel('report'),
       maxOutputTokens: 2000,
-      output: Output.object({ schema: ReportSchema, name: 'report' }),
-      prompt: `أنت محلل أداء مهني. حلّل هذه المحاكاة وأنشئ تقريراً شاملاً.
+      output: Output.object({ schema: ReportNarrativeSchema, name: 'report' }),
+      prompt: `أنت محلل أداء مهني. اكتب التقييم النصي لهذه المحاكاة.
 
 المسار الوظيفي: ${trackTitle}
 بيئة العمل: ${companyContext}
 المدة: ${durationMinutes} دقيقة
 المهام المنجزة: ${tasksCompleted} من ${totalTasks}
 
+درجات المهام (لعلمك فقط):
+${taskScoresText}
+
 ملخص المحادثات:
 ${conversationsSummary}
 
-أعطِ تقييمات صادقة بناءً على المحادثات. الدرجات بين 0-100. النصوص بالعربية.`,
+بناءً على المعلومات أعلاه، اكتب:
+- verdict: تقييم شامل للمستخدم (3-4 جمل)
+- strengths: نقطتا قوة أو أكثر
+- improvements: نقطة تطوير أو أكثر
+- agentFeedbacks: تقييم كل زميل من وجهة نظره
+- recommendation: توصية للجلسة القادمة
+
+النصوص بالعربية.`,
     });
 
-    return result.output as ReportData;
+    return {
+      ...quantitative,
+      ...(result.output as { verdict: string; strengths: string[]; improvements: string[]; agentFeedbacks: Record<string, string>; recommendation: string }),
+    };
   } catch (err) {
     if (NoObjectGeneratedError.isInstance(err)) {
       console.error('[generateReport] text:', err.text);
@@ -455,14 +549,11 @@ ${conversationsSummary}
       console.error('[generateReport]', String(err));
     }
     return {
-      overallScore: 0,
-      qualityScore: 0,
-      speedScore: 0,
-      communicationScore: 0,
+      ...quantitative,
       verdict: 'تعذّر توليد التقرير، حاول مجدداً.',
       strengths: [],
       improvements: [],
-      agentFeedbacks: {},
+      agentFeedbacks: { manager: '', colleague_1: '', colleague_2: '' },
       recommendation: '',
     };
   }

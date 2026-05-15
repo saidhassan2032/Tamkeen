@@ -1,5 +1,5 @@
 import { POST } from '@/app/api/tasks/[id]/complete/route';
-import { db, tasks, messages } from '@/lib/db';
+import { db, tasks } from '@/lib/db';
 import { NextRequest } from 'next/server';
 
 function chainable() {
@@ -30,9 +30,8 @@ jest.mock('crypto', () => ({
   randomUUID: jest.fn().mockReturnValue('test-uuid'),
 }));
 
-function makeRequest(force = false): NextRequest {
-  const url = force ? 'http://localhost?force=true' : 'http://localhost';
-  return { url } as unknown as NextRequest;
+function makeRequest(): NextRequest {
+  return { url: 'http://localhost' } as unknown as NextRequest;
 }
 
 describe('Task Completion Endpoint', () => {
@@ -67,10 +66,6 @@ describe('Task Completion Endpoint', () => {
   const completedTaskShape = {
     taskStatus: 'completed',
     transitioned: true,
-    blocked: false,
-    feedback: null,
-    canSkip: false,
-    skipWarning: null,
     done: false,
     nextTask: expect.objectContaining({ id: 'next-task-id', status: 'started' }),
   };
@@ -79,7 +74,7 @@ describe('Task Completion Endpoint', () => {
     jest.clearAllMocks();
   });
 
-  describe('normal completion (status was set to completed by TASK_STATE)', () => {
+  describe('normal completion (status was set to completed by agent)', () => {
     test('should activate next task when current is already completed', async () => {
       (db.transaction as jest.Mock).mockImplementation((callback) => {
         const mockTx = {
@@ -136,8 +131,8 @@ describe('Task Completion Endpoint', () => {
     });
   });
 
-  describe('blocked completions (started status)', () => {
-    test('should block when task is "started"', async () => {
+  describe('blocked completions (not completed)', () => {
+    test('should return 400 when task is "started"', async () => {
       (db.transaction as jest.Mock).mockImplementation((callback) => {
         const mockTx = {
           select: jest.fn().mockReturnThis(),
@@ -149,115 +144,26 @@ describe('Task Completion Endpoint', () => {
       });
 
       const response = await POST(makeRequest(), { params: mockParams });
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json).toMatchObject({
-        taskStatus: 'started',
-        transitioned: false,
-        blocked: true,
-        canSkip: true,
-        skipWarning: expect.any(String),
-        nextTask: null,
-        done: false,
-      });
+      expect(json.error).toBe('المهمة لم تنجز بعد');
     });
 
-    test('should block when task is "largely" and provide feedback', async () => {
+    test('should return 400 when task is "largely"', async () => {
       (db.transaction as jest.Mock).mockImplementation((callback) => {
         const mockTx = {
           select: jest.fn().mockReturnThis(),
           from: jest.fn().mockReturnThis(),
           where: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          get: jest.fn()
-            .mockImplementationOnce(() => ({ ...baseTask, status: 'largely' }))
-            .mockImplementationOnce(() => ({ content: 'تحتاج تعديل على التنسيق' })),
+          get: jest.fn().mockImplementationOnce(() => ({ ...baseTask, status: 'largely' })),
         };
         return callback(mockTx);
       });
 
       const response = await POST(makeRequest(), { params: mockParams });
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json).toMatchObject({
-        taskStatus: 'largely',
-        transitioned: false,
-        blocked: true,
-        feedback: 'تحتاج تعديل على التنسيق',
-        canSkip: true,
-        nextTask: null,
-        done: false,
-      });
-    });
-
-    test('should handle backward compat with "active" status', async () => {
-      (db.transaction as jest.Mock).mockImplementation((callback) => {
-        const mockTx = {
-          select: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          get: jest.fn().mockImplementationOnce(() => ({ ...baseTask, status: 'active' })),
-        };
-        return callback(mockTx);
-      });
-
-      const response = await POST(makeRequest(), { params: mockParams });
-      expect(response.status).toBe(200);
-      const json = await response.json();
-      expect(json).toMatchObject({
-        taskStatus: 'started',
-        blocked: true,
-      });
-    });
-  });
-
-  describe('force completion', () => {
-    test('should force-complete a "started" task with low scores', async () => {
-      (db.transaction as jest.Mock).mockImplementation((callback) => {
-        const mockTx = {
-          select: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          get: jest.fn()
-            .mockImplementationOnce(() => ({ ...baseTask, status: 'started' }))
-            .mockImplementationOnce(() => mockPendingTask),
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          insert: jest.fn().mockReturnThis(),
-          values: jest.fn().mockReturnThis(),
-        };
-        return callback(mockTx);
-      });
-
-      const response = await POST(makeRequest(true), { params: mockParams });
-      expect(response.status).toBe(200);
-      const json = await response.json();
-      expect(json).toMatchObject(completedTaskShape);
-    });
-
-    test('should force-complete a "largely" task', async () => {
-      (db.transaction as jest.Mock).mockImplementation((callback) => {
-        const mockTx = {
-          select: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          orderBy: jest.fn().mockReturnThis(),
-          get: jest.fn()
-            .mockImplementationOnce(() => ({ ...baseTask, status: 'largely' }))
-            .mockImplementationOnce(() => mockPendingTask),
-          update: jest.fn().mockReturnThis(),
-          set: jest.fn().mockReturnThis(),
-          insert: jest.fn().mockReturnThis(),
-          values: jest.fn().mockReturnThis(),
-        };
-        return callback(mockTx);
-      });
-
-      const response = await POST(makeRequest(true), { params: mockParams });
-      expect(response.status).toBe(200);
-      const json = await response.json();
-      expect(json).toMatchObject(completedTaskShape);
+      expect(json.error).toBe('المهمة لم تنجز بعد');
     });
   });
 
@@ -276,7 +182,7 @@ describe('Task Completion Endpoint', () => {
       const response = await POST(makeRequest(), { params: mockParams });
       expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toContain('حدث خطأ');
+      expect(json.error).toContain('مهمة غير موجودة');
     });
 
     test('should return 400 for pending tasks', async () => {
@@ -291,9 +197,9 @@ describe('Task Completion Endpoint', () => {
       });
 
       const response = await POST(makeRequest(), { params: mockParams });
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
       const json = await response.json();
-      expect(json.error).toContain('حدث خطأ');
+      expect(json.error).toBe('المهمة لم تنجز بعد');
     });
 
     test('should rollback transaction on error', async () => {
@@ -303,9 +209,7 @@ describe('Task Completion Endpoint', () => {
       });
 
       const response = await POST(makeRequest(), { params: mockParams });
-      expect(response.status).toBe(500);
-      const json = await response.json();
-      expect(json.error).toContain('حدث خطأ');
+      expect(response.status).toBe(400);
     });
   });
 });

@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { db, messages, tasks, sessions, agents, type Agent } from '@/lib/db';
-import { streamAgentReply } from '@/lib/claude';
+import { streamAgentReply, evaluateTask } from '@/lib/claude';
 import { createSSEStream } from '@/lib/sse';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, or, asc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export const maxDuration = 60;
@@ -100,8 +100,6 @@ export async function POST(req: NextRequest) {
     if (other) otherAgentName = `${other.name} (${other.roleTitle})`;
   }
 
-  const userTurns = myMessages.filter((m) => m.role === 'user').length;
-  const shouldEvaluate = userTurns >= 4;
   const startedAt = currentTask.startedAt ?? Date.now();
   const timeRemaining = Math.max(
     0,
@@ -136,7 +134,6 @@ export async function POST(req: NextRequest) {
       currentTask.description,
       timeRemaining,
       conversationHistory,
-      shouldEvaluate,
       agentRole,
       crossContext,
       otherAgentName,
@@ -155,19 +152,6 @@ export async function POST(req: NextRequest) {
       timestamp: Date.now(),
     });
 
-    if (result.score) {
-      await db
-        .update(tasks)
-        .set({
-          qualityScore: result.score.quality,
-          speedScore: result.score.speed,
-          communicationScore: result.score.communication,
-          verdict: result.score.verdict,
-        })
-        .where(eq(tasks.id, currentTask.id));
-      send({ type: 'evaluated', taskId: currentTask.id, score: result.score });
-    }
-
     if (result.taskState && currentTask.status !== 'completed') {
       const update: Record<string, any> = { status: result.taskState };
       if (result.taskState === 'completed') {
@@ -180,6 +164,59 @@ export async function POST(req: NextRequest) {
 
       if (result.taskState === 'completed') {
         send({ type: 'task_completed', taskId: currentTask.id });
+
+        // Trigger post-task evaluation (hidden, backend-only)
+        const allTaskMessages = await db
+          .select()
+          .from(messages)
+          .where(eq(messages.sessionId, sessionId))
+          .orderBy(asc(messages.timestamp));
+
+        const agentNames = Object.fromEntries(
+          allAgents.map((a) => [a.id, a.name]),
+        );
+
+        const taskConv = allTaskMessages
+          .filter((m) => currentTask.startedAt ? m.timestamp >= currentTask.startedAt : true)
+          .map((m) => {
+            const speaker = m.role === 'user' ? 'المستخدم' : (agentNames[m.agentId] ?? m.agentId);
+            return `[${speaker}]: ${m.content}`;
+          })
+          .join('\n');
+
+        const taskName = currentTask.title;
+        const taskDesc = currentTask.description;
+        const diff = currentTask.difficulty;
+
+        const curTask = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, currentTask.id))
+          .get();
+
+        const extensions = curTask?.extensions ?? 0;
+
+        const evalResult = await evaluateTask(
+          taskName,
+          taskDesc,
+          diff,
+          extensions,
+          session.trackId,
+          session.companyContext,
+          taskConv || '(بدون محادثة)',
+        );
+
+        if (evalResult) {
+          await db
+            .update(tasks)
+            .set({
+              qualityScore: evalResult.quality,
+              speedScore: evalResult.speed,
+              communicationScore: evalResult.communication,
+              verdict: evalResult.verdict,
+            })
+            .where(eq(tasks.id, currentTask.id));
+        }
       }
     }
 

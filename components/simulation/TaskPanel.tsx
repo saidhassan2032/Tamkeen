@@ -14,6 +14,7 @@ interface Task {
   difficulty: number;
   status: string;
   startedAt: number | null;
+  extensions?: number;
 }
 
 interface Props {
@@ -31,10 +32,14 @@ export function TaskPanel({ task, timeRemaining, totalTasks, completedTasks, onC
   const isUrgent = timeRemaining > 0 && timeRemaining < 2 * 60 * 1000;
   const isWarning = timeRemaining > 2 * 60 * 1000 && timeRemaining < 5 * 60 * 1000;
   const expired = timeRemaining === 0;
+  const extensions = task.extensions ?? 0;
 
   const timeTone = expired || isUrgent ? 'text-danger' : isWarning ? 'text-warning' : 'text-text-muted';
   const timeValueTone = expired || isUrgent ? 'text-danger' : isWarning ? 'text-warning' : 'text-text';
   const barTone = isUrgent || expired ? '[&>div]:bg-danger' : isWarning ? '[&>div]:bg-warning' : '';
+
+  const isCompleted = task.status === 'completed';
+  const canComplete = isCompleted;
 
   return (
     <div className="border-b border-border bg-surface p-5">
@@ -47,6 +52,10 @@ export function TaskPanel({ task, timeRemaining, totalTasks, completedTasks, onC
 
       <h3 className="font-semibold text-base mb-2 leading-snug">{task.title}</h3>
       <p className="text-xs text-text-secondary leading-relaxed mb-4">{task.description}</p>
+
+      {extensions > 0 && (
+        <p className="text-[11px] text-warning mb-2">تم تمديد الوقت {extensions} مرة</p>
+      )}
 
       <div className="space-y-2 mb-4">
         <div className="flex items-center justify-between text-xs">
@@ -63,16 +72,18 @@ export function TaskPanel({ task, timeRemaining, totalTasks, completedTasks, onC
 
       <Button
         onClick={onComplete}
-        disabled={isCompleting}
-        className={`w-full ${task.status === 'completed' ? 'animate-pulse ring-2 ring-green-500 shadow-lg shadow-green-500/30' : ''}`}
+        disabled={!canComplete || isCompleting}
+        className={`w-full ${canComplete ? 'animate-pulse ring-2 ring-green-500 shadow-lg shadow-green-500/30' : ''}`}
         size="sm"
       >
         <CheckCircle2 className="w-4 h-4 ml-2" />
         {isCompleting
           ? 'جاري الإنهاء...'
-          : task.status === 'completed'
+          : canComplete
             ? 'تم الإنجاز — اضغط للمتابعة'
-            : 'إنهاء المهمة'}
+            : expired
+              ? 'انتهى الوقت — انتظر التقييم'
+              : 'أنهي المهمة مع الزملاء أولاً'}
       </Button>
     </div>
   );

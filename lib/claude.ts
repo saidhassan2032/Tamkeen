@@ -12,13 +12,16 @@ export {
   streamAgentReply,
   getGuidance,
   generateReport,
+  evaluateTask,
+  computeDeadlineMinutes,
 } from './ai';
 
 export type {
   GeneratedTask,
   HistoryItem,
   ReportData,
-  ChatScore,
   StreamReplyResult,
   AgentInfo,
+  TaskEvalResult,
+  TaskScoreEntry,
 } from './ai';

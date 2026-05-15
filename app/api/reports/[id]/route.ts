@@ -67,6 +67,16 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
     const endedAt = session.endedAt ?? Date.now();
     const durationMinutes = Math.max(1, Math.floor((endedAt - session.startedAt) / 60000));
 
+    const taskScores = allTasks.map((t) => ({
+      title: t.title,
+      quality: t.qualityScore,
+      speed: t.speedScore,
+      communication: t.communicationScore,
+      difficulty: t.difficulty,
+      extensions: t.extensions ?? 0,
+      verdict: t.verdict,
+    }));
+
     const reportData = await generateReport(
       session.trackId,
       session.companyContext,
@@ -74,16 +84,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
       allTasks.filter((t) => t.status === 'completed').length,
       allTasks.length,
       summary,
+      taskScores,
     );
 
     const reportId = randomUUID();
-    const taskScores = allTasks.map((t) => ({
-      title: t.title,
-      quality: t.qualityScore,
-      speed: t.speedScore,
-      communication: t.communicationScore,
-      verdict: t.verdict,
-    }));
 
     await db.insert(reports).values({
       id: reportId,

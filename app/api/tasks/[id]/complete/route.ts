@@ -1,40 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, tasks, messages, sessions } from '@/lib/db';
-import { generateOneTask } from '@/lib/claude';
+import { generateOneTask, computeDeadlineMinutes } from '@/lib/claude';
 import type { AgentInfo } from '@/lib/claude';
 import { AGENT_TEMPLATES } from '@/types';
-import { eq, and, asc, desc, count } from 'drizzle-orm';
+import { eq, and, asc, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { searchParams } = new URL(req.url);
-    const force = searchParams.get('force') === 'true';
-
     let result: {
       taskStatus: string;
       transitioned: boolean;
-      blocked: boolean;
-      feedback: string | null;
-      canSkip: boolean;
-      skipWarning: string | null;
       nextTask: any;
       done: boolean;
     } = {
       taskStatus: 'pending',
       transitioned: false,
-      blocked: false,
-      feedback: null,
-      canSkip: false,
-      skipWarning: null,
       nextTask: null,
       done: false,
     };
 
     let sessionId: string | null = null;
-    let skippedTaskTitle: string | null = null;
 
     await db.transaction(async (tx) => {
       const completedTask = await tx.select().from(tasks).where(eq(tasks.id, params.id)).get();
@@ -43,97 +31,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
 
       sessionId = completedTask.sessionId;
-      const status = completedTask.status;
-      const activeStates = ['started', 'active'];
 
-      if (status === 'completed') {
-        if (!completedTask.completedAt) {
-          await tx
-            .update(tasks)
-            .set({ completedAt: Date.now() })
-            .where(eq(tasks.id, params.id));
-        }
-        const nextTask = await activateNextTask(tx, completedTask.sessionId);
-        result = {
-          taskStatus: 'completed',
-          transitioned: true,
-          blocked: false,
-          feedback: null,
-          canSkip: false,
-          skipWarning: null,
-          nextTask: nextTask?.task ?? null,
-          done: false,
-        };
-        return;
+      if (completedTask.status !== 'completed') {
+        throw new Error('المهمة لم تنجز بعد');
       }
 
-      if (!force) {
-        if (activeStates.includes(status)) {
-          result = {
-            taskStatus: status === 'active' ? 'started' : status,
-            transitioned: false,
-            blocked: true,
-            feedback: 'لم تقم بالعمل الكافي بعد. تواصل مع الزملاء لإنجاز المهمة.',
-            canSkip: true,
-            skipWarning: 'إذا تخطيت الآن، سيتأثر تقييم أدائك بشكل كبير',
-            nextTask: null,
-            done: false,
-          };
-          return;
-        }
-        if (status === 'largely') {
-          const lastAgentMsg = await tx
-            .select()
-            .from(messages)
-            .where(and(
-              eq(messages.sessionId, completedTask.sessionId),
-              eq(messages.agentId, completedTask.assignedByAgentId),
-              eq(messages.role, 'assistant'),
-            ))
-            .orderBy(desc(messages.timestamp))
-            .get();
-
-          result = {
-            taskStatus: 'largely',
-            transitioned: false,
-            blocked: true,
-            feedback: lastAgentMsg?.content ?? 'المهمة شبه منجزة، يرجى مراجعة ملاحظات الزملاء.',
-            canSkip: true,
-            skipWarning: 'إذا تخطيت الآن، قد يتأثر تقييم أدائك بشكل بسيط',
-            nextTask: null,
-            done: false,
-          };
-          return;
-        }
-        throw new Error('المهمة غير جاهزة للإنجاز');
+      if (!completedTask.completedAt) {
+        await tx
+          .update(tasks)
+          .set({ completedAt: Date.now() })
+          .where(eq(tasks.id, params.id));
       }
-
-      skippedTaskTitle = completedTask.title;
-
-      const verdict = status === 'largely'
-        ? 'تم تخطي المهمة — كانت شبه منجزة'
-        : 'تم تخطي المهمة — لم تنجز بالكامل';
-
-      await tx
-        .update(tasks)
-        .set({
-          status: 'completed',
-          completedAt: Date.now(),
-          qualityScore: 1,
-          speedScore: 1,
-          communicationScore: 1,
-          verdict,
-        })
-        .where(eq(tasks.id, params.id));
 
       const nextTask = await activateNextTask(tx, completedTask.sessionId);
       result = {
         taskStatus: 'completed',
         transitioned: true,
-        blocked: false,
-        feedback: null,
-        canSkip: false,
-        skipWarning: null,
         nextTask: nextTask?.task ?? null,
         done: false,
       };
@@ -196,7 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             resources: JSON.stringify(generated.resources ?? []),
             guidanceTips: JSON.stringify(generated.guidanceTips ?? []),
             starterMessage: generated.starterMessage ?? null,
-            deadlineMinutes: generated.deadlineMinutes ?? 15,
+            deadlineMinutes: generated.deadlineMinutes,
             sortOrder: nextIndex + 1,
             status: 'started',
             difficulty: generated.difficulty ?? nextIndex + 1,
@@ -225,7 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             resources: JSON.stringify(generated.resources ?? []),
             guidanceTips: JSON.stringify(generated.guidanceTips ?? []),
             starterMessage: generated.starterMessage ?? null,
-            deadlineMinutes: generated.deadlineMinutes ?? 15,
+            deadlineMinutes: generated.deadlineMinutes,
             sortOrder: nextIndex + 1,
             status: 'started',
             difficulty: generated.difficulty ?? nextIndex + 1,
@@ -243,29 +156,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
-    if (force && skippedTaskTitle && result.nextTask && result.nextTask.startedAt) {
-      const skipContextMessage =
-        `بخصوص مهمة "${skippedTaskTitle}"، للأسف ما اشتغلت عليها بما يكفي، ` +
-        `فقررنا نوكلها لشخص ثاني عشان ننزل الشغل. ركّز الحين على المهمة الجديدة.`;
-
-      await db.insert(messages).values({
-        id: randomUUID(),
-        sessionId: sessionId!,
-        agentId: result.nextTask.assignedByAgentId,
-        role: 'assistant',
-        content: skipContextMessage,
-        timestamp: result.nextTask.startedAt - 1,
-      });
-    }
-
     return NextResponse.json(result);
   } catch (err: any) {
-    console.error('POST /api/tasks/[id]/complete failed', err);
-    const status = err.message === 'مهمة غير موجودة' ? 400 : 500;
-    const message = process.env.NODE_ENV === 'production'
-      ? 'حدث خطأ في الاتصال، حاول مجدداً'
-      : `حدث خطأ: ${err?.message ?? 'غير محدد'}`;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: err?.message || 'المهمة لم تنجز بعد' }, { status: 400 });
   }
 }
 
