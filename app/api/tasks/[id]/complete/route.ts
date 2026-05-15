@@ -34,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     };
 
     let sessionId: string | null = null;
+    let skippedTaskTitle: string | null = null;
 
     await db.transaction(async (tx) => {
       const completedTask = await tx.select().from(tasks).where(eq(tasks.id, params.id)).get();
@@ -106,6 +107,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         }
         throw new Error('المهمة غير جاهزة للإنجاز');
       }
+
+      skippedTaskTitle = completedTask.title;
 
       const verdict = status === 'largely'
         ? 'تم تخطي المهمة — كانت شبه منجزة'
@@ -238,6 +241,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       } else {
         result.done = true;
       }
+    }
+
+    if (force && skippedTaskTitle && result.nextTask && result.nextTask.startedAt) {
+      const skipContextMessage =
+        `بخصوص مهمة "${skippedTaskTitle}"، للأسف ما اشتغلت عليها بما يكفي، ` +
+        `فقررنا نوكلها لشخص ثاني عشان ننزل الشغل. ركّز الحين على المهمة الجديدة.`;
+
+      await db.insert(messages).values({
+        id: randomUUID(),
+        sessionId: sessionId!,
+        agentId: result.nextTask.assignedByAgentId,
+        role: 'assistant',
+        content: skipContextMessage,
+        timestamp: result.nextTask.startedAt - 1,
+      });
     }
 
     return NextResponse.json(result);
