@@ -63,9 +63,9 @@ export default async function LandingPage() {
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold leading-[1.15] tracking-tight mb-6">
-            جرّب أول شهر في وظيفتك
+            جرّب وظيفتك
             <br />
-            <span className="text-brand block mt-5">قبل أن تبدأها</span>
+            <span className="text-brand block mt-5">قبل ما تبدأها</span>
           </h1>
 
           <p className="text-base md:text-lg text-text-secondary max-w-xl mx-auto mb-10 leading-relaxed">

@@ -4,7 +4,7 @@ import { ThemeProvider, themeBootstrapScript } from '@/components/theme/ThemePro
 
 export const metadata: Metadata = {
   title: 'تمكين — منصة المحاكاة المهنية',
-  description: 'محاكاة مهنية للخريجين السعوديين — جرّب أول شهر في وظيفتك قبل أن تبدأ',
+  description: 'محاكاة مهنية للخريجين السعوديين — جرّب وظيفتك قبل ما تبدأها',
   icons: { icon: '/mark.png' },
 };
 
