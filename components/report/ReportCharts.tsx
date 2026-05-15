@@ -11,6 +11,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  Legend,
 } from 'recharts';
 
 interface TaskScore {
@@ -28,16 +29,15 @@ interface Report {
   taskScores?: TaskScore[];
 }
 
-// Read CSS variables at runtime so charts auto-adapt to light/dark mode.
 function useThemeColors() {
   const [colors, setColors] = useState({
-    brand: '#1F1B98',
-    accent: '#FF6A00',
-    success: '#16A34A',
-    surface: '#F8F9FB',
+    brand:    '#1F1B98',
+    accent:   '#FF6A00',
+    success:  '#16A34A',
+    surface:  '#F8F9FB',
     surface2: '#EEF0F6',
-    border: '#E4E5F3',
-    muted: '#6B7280',
+    border:   '#E4E5F3',
+    muted:    '#6B7280',
   });
 
   useEffect(() => {
@@ -55,7 +55,6 @@ function useThemeColors() {
       });
     };
     read();
-    // Re-read on theme change
     const obs = new MutationObserver(read);
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => obs.disconnect();
@@ -64,68 +63,135 @@ function useThemeColors() {
   return colors;
 }
 
+const GAUGE_META = [
+  { key: 'qualityScore',       label: 'الكفاءة التقنية',  color: 'brand'   },
+  { key: 'speedScore',         label: 'سرعة الإنجاز',     color: 'success' },
+  { key: 'communicationScore', label: 'مهارات التواصل',   color: 'accent'  },
+] as const;
+
+function ScoreArc({
+  value,
+  color,
+  bgColor,
+  size = 120,
+}: {
+  value: number;
+  color: string;
+  bgColor: string;
+  size?: number;
+}) {
+  const r = 44;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  const dashOffset = circumference * (1 - value / 100);
+
+  return (
+    <svg width={size} height={size}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke={bgColor} strokeWidth="9" />
+      <circle
+        cx={cx} cy={cy} r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth="9"
+        strokeDasharray={circumference}
+        strokeDashoffset={dashOffset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${cx} ${cy})`}
+        style={{ transition: 'stroke-dashoffset 1s ease' }}
+      />
+    </svg>
+  );
+}
+
 export function ReportCharts({ report }: { report: Report }) {
   const c = useThemeColors();
 
-  const gaugeData = [
-    { name: 'جودة العمل',    value: report.qualityScore,       fill: c.brand },
-    { name: 'سرعة الإنجاز',  value: report.speedScore,         fill: c.success },
-    { name: 'التواصل',        value: report.communicationScore, fill: c.accent },
-  ];
+  const colorMap: Record<string, string> = {
+    brand:   c.brand,
+    success: c.success,
+    accent:  c.accent,
+  };
 
   const taskBars = (report.taskScores ?? [])
     .filter((t) => t.quality != null || t.speed != null || t.communication != null)
     .map((t, i) => ({
-      name: `م${i + 1}`,
+      name:  `م${i + 1}`,
       title: t.title,
-      جودة: t.quality ?? 0,
-      سرعة: t.speed ?? 0,
-      تواصل: t.communication ?? 0,
+      جودة:   t.quality       ?? 0,
+      سرعة:   t.speed         ?? 0,
+      تواصل:  t.communication ?? 0,
       skipped: t.verdict?.includes('تم التخطي') ?? false,
     }));
 
   return (
     <>
+      {/* Gauge cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {gaugeData.map((item) => (
-          <div
-            key={item.name}
-            className="bg-surface border border-border rounded-xl p-5 text-center"
-          >
-            <ResponsiveContainer width="100%" height={140}>
-              <RadialBarChart
-                innerRadius="65%"
-                outerRadius="100%"
-                data={[item]}
-                startAngle={90}
-                endAngle={-270}
-              >
-                <RadialBar dataKey="value" cornerRadius={8} fill={item.fill} background={{ fill: c.surface2 }} />
-              </RadialBarChart>
-            </ResponsiveContainer>
-            <div className="text-2xl font-bold mt-1" style={{ color: item.fill }}>
-              {item.value}%
+        {GAUGE_META.map(({ key, label, color }) => {
+          const val = report[key];
+          const fill = colorMap[color];
+          return (
+            <div
+              key={key}
+              className="bg-surface border border-border rounded-2xl p-6 flex flex-col items-center gap-3"
+            >
+              <div className="relative">
+                <ScoreArc value={val} color={fill} bgColor={c.surface2} />
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center"
+                  style={{ color: fill }}
+                >
+                  <span className="text-2xl font-bold leading-none">{val}</span>
+                  <span className="text-[10px] opacity-60 mt-0.5">%</span>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-semibold">{label}</div>
+                <div
+                  className="text-xs mt-1 font-medium px-2.5 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${fill}18`, color: fill }}
+                >
+                  {val >= 80 ? 'ممتاز' : val >= 65 ? 'جيد جداً' : val >= 50 ? 'مقبول' : 'يحتاج تطوير'}
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-text-muted mt-1">{item.name}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
+      {/* Task-by-task bar chart */}
       {taskBars.length > 0 && (
-        <div className="bg-surface border border-border rounded-xl p-6">
-          <h3 className="text-base font-semibold mb-4">أداؤك في كل مهمة</h3>
+        <div className="bg-surface border border-border rounded-2xl p-6 md:p-8">
+          <div className="mb-5">
+            <h3 className="text-base font-bold">أداؤك في كل مهمة</h3>
+            <p className="text-xs text-text-muted mt-1">مقارنة تفصيلية بين المهارات لكل مهمة منجَزة</p>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={taskBars} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={c.border} />
-              <XAxis dataKey="name" stroke={c.muted} fontSize={12} />
-              <YAxis stroke={c.muted} fontSize={12} domain={[0, 100]} />
+            <BarChart data={taskBars} margin={{ top: 8, right: 4, left: -12, bottom: 0 }} barGap={3}>
+              <CartesianGrid strokeDasharray="3 3" stroke={c.border} vertical={false} />
+              <XAxis
+                dataKey="name"
+                stroke={c.muted}
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                stroke={c.muted}
+                fontSize={12}
+                domain={[0, 10]}
+                tickLine={false}
+                axisLine={false}
+              />
               <Tooltip
-                cursor={{ fill: c.surface2, opacity: 0.5 }}
+                cursor={{ fill: c.surface2, opacity: 0.6, rx: 4 }}
                 contentStyle={{
                   backgroundColor: c.surface,
                   border: `1px solid ${c.border}`,
-                  borderRadius: 8,
+                  borderRadius: 10,
                   fontSize: 12,
+                  padding: '8px 12px',
                 }}
                 labelFormatter={(label, payload) => {
                   const item = payload?.[0]?.payload;
@@ -133,9 +199,14 @@ export function ReportCharts({ report }: { report: Report }) {
                   return `${item?.title ?? label}${skippedLabel}`;
                 }}
               />
-              <Bar dataKey="جودة" fill={c.brand}   radius={[6, 6, 0, 0]} />
-              <Bar dataKey="سرعة" fill={c.success} radius={[6, 6, 0, 0]} />
-              <Bar dataKey="تواصل" fill={c.accent}  radius={[6, 6, 0, 0]} />
+              <Legend
+                wrapperStyle={{ fontSize: 12, paddingTop: 16 }}
+                iconType="circle"
+                iconSize={8}
+              />
+              <Bar dataKey="جودة"  fill={c.brand}   radius={[5, 5, 0, 0]} maxBarSize={24} />
+              <Bar dataKey="سرعة"  fill={c.success} radius={[5, 5, 0, 0]} maxBarSize={24} />
+              <Bar dataKey="تواصل" fill={c.accent}  radius={[5, 5, 0, 0]} maxBarSize={24} />
             </BarChart>
           </ResponsiveContainer>
         </div>
