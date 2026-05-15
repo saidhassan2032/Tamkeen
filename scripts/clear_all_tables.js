@@ -13,14 +13,28 @@ if (!url || !authToken) {
   process.exit(1);
 }
 
+const tables = [
+  'tasks',
+  'messages',
+  'reports',
+  'user_sessions',
+  'sessions',
+  'users',
+  'agents',
+];
+
 async function main() {
   const client = createClient({ url, authToken });
-  await client.execute({ sql: 'DELETE FROM tasks;' });
-  await client.execute({ sql: 'DELETE FROM messages;' });
-  console.log('Deleted all rows from tasks and messages.');
+
+  for (const table of tables) {
+    await client.execute({ sql: `DELETE FROM ${table};` });
+    console.log(`Deleted all rows from ${table}.`);
+  }
+
+  console.log('Done! All tables cleared.');
 }
 
 main().catch((err) => {
-  console.error('Failed to clear tasks/messages:', err);
+  console.error('Failed to clear tables:', err);
   process.exit(1);
 });
