@@ -341,7 +341,7 @@ export default function SimulationPage() {
 
   const handleFinishToReport = () => {
     setRedirectingToReport(true);
-    router.push(`/report/${sessionId}`);
+    router.push(`/report-preview/${sessionId}`);
   };
 
   if (loading) {
