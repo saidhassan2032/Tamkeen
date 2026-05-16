@@ -10,6 +10,9 @@ import {
   MessageSquare,
   RotateCcw,
   ExternalLink,
+  FileText,
+  Calendar,
+  TrendingUp,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -93,11 +96,127 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { tab?: string };
+}) {
   const user = await getCurrentUser();
   const data = await fetchUserReports();
   const last = data.reports[0];
   const hasReports = !!last;
+
+  /* ── Reports Tab ── */
+  if (searchParams?.tab === 'reports') {
+    return (
+      <>
+        <DashboardTopbar title="التقارير" />
+        <main className="flex-1 px-6 lg:px-10 py-8 max-w-6xl w-full space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold mb-1">سجل التقارير</h1>
+              <p className="text-sm text-text-muted">
+                {data.reports.length > 0
+                  ? `لديك ${data.reports.length} تقرير محاكاة`
+                  : 'لا توجد تقارير بعد — ابدأ محاكاتك الأولى.'}
+              </p>
+            </div>
+            <Link href="/select-major">
+              <Button size="sm" className="gap-2">
+                محاكاة جديدة
+                <RotateCcw className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
+          </div>
+
+          {data.reports.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface p-16 text-center">
+              <FileText className="w-12 h-12 text-text-muted mx-auto mb-4 opacity-40" />
+              <p className="text-sm text-text-muted">لا توجد تقارير حتى الآن.</p>
+              <Link href="/select-major" className="mt-4 inline-block">
+                <Button size="sm" variant="outline">ابدأ محاكاة</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {data.reports.map((r, idx) => {
+                const meta = verdictMeta(r.overallScore);
+                const formattedDate = new Date(r.generatedAt).toLocaleDateString('ar-SA', {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                });
+                return (
+                  <div
+                    key={r.id}
+                    className="rounded-2xl border border-border bg-surface p-5 flex flex-col gap-4 hover:border-brand/40 transition-colors"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-xl bg-brand/10 text-brand text-lg font-bold flex items-center justify-center shrink-0 tabular-nums">
+                        {r.overallScore}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold truncate">
+                            {r.trackId ?? 'محاكاة'}
+                          </span>
+                          {idx === 0 && (
+                            <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-full">
+                              الأحدث
+                            </span>
+                          )}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                            r.overallScore >= 80 ? 'bg-green-500/10 text-green-600 dark:text-green-400' :
+                            r.overallScore >= 65 ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                            r.overallScore >= 50 ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                            'bg-red-500/10 text-red-600 dark:text-red-400'
+                          }`}>
+                            {meta.badge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-text-muted mt-1 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {formattedDate}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Mini scores */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      {[
+                        { label: 'الكفاءة', value: r.qualityScore },
+                        { label: 'التواصل', value: r.communicationScore },
+                        { label: 'السرعة',  value: r.speedScore },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="rounded-lg bg-surface2 py-2 px-1">
+                          <div className="text-sm font-bold text-brand">{value}%</div>
+                          <div className="text-[10px] text-text-muted">{label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Verdict preview */}
+                    {r.verdict && (
+                      <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed border-s-2 border-brand/30 ps-3">
+                        {r.verdict}
+                      </p>
+                    )}
+
+                    {/* Action */}
+                    <Link href={`/report/${r.id}`} className="mt-auto">
+                      <Button size="sm" className="w-full gap-2">
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        عرض التقرير
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Home, Sparkles, BarChart3, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,18 +11,20 @@ type NavItem = {
   href: string;
   label: string;
   Icon: typeof Home;
-  match: (path: string) => boolean;
+  match: (path: string, tab: string | null) => boolean;
 };
 
 const NAV: NavItem[] = [
-  { href: '/dashboard',    label: 'الرئيسية',  Icon: Home,      match: (p) => p === '/dashboard' },
+  { href: '/dashboard',    label: 'الرئيسية',  Icon: Home,      match: (p, t) => p === '/dashboard' && t !== 'reports' },
   { href: '/select-major', label: 'المحاكاة',  Icon: Sparkles,  match: (p) => p.startsWith('/select-') || p.startsWith('/simulation') },
-  { href: '/dashboard?tab=reports', label: 'التقارير', Icon: BarChart3, match: (p) => p.startsWith('/report') },
+  { href: '/dashboard?tab=reports', label: 'التقارير', Icon: BarChart3, match: (p, t) => p.startsWith('/report') || (p === '/dashboard' && t === 'reports') },
   { href: '/settings',     label: 'الإعدادات', Icon: Settings,  match: (p) => p.startsWith('/settings') },
 ];
 
 export function DashboardSidebar() {
   const pathname = usePathname() ?? '';
+  const searchParams = useSearchParams();
+  const tab = searchParams?.get('tab') ?? null;
   const { theme } = useTheme();
   const markSrc = theme === 'dark' ? '/white_mark.png' : '/mark.png';
 
@@ -38,7 +40,7 @@ export function DashboardSidebar() {
 
       <nav className="flex-1 px-3 py-5 space-y-1">
         {NAV.map(({ href, label, Icon, match }) => {
-          const active = match(pathname);
+          const active = match(pathname, tab);
           return (
             <Link
               key={href}
