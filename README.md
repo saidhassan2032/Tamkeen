@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/tamkeen-logo.svg" alt="Tamkeen Logo" width="120" />
+<img src="public/white_logo.png" alt="Tamkeen Logo" width="120" />
 
 # Tamkeen · تمكين
 
